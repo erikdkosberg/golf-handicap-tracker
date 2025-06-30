@@ -24,7 +24,7 @@ function App() {
     <div className="min-h-screen bg-gradient-to-tr from-indigo-50 via-white to-sky-100 flex flex-col items-center">
       <header className="w-full flex flex-col items-center py-8 mb-4">
         <h1 className="text-4xl font-extrabold text-indigo-700 tracking-tight">
-          Golf Handicap Calculator
+          Golf Handicap Tracker
         </h1>
         <p className="text-lg text-gray-600 mt-2">
           Track your golf handicap and see how your next round can change it.

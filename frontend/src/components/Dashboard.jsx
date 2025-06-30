@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import RoundRow from "./RoundRow";
 import AddRoundForm from "./AddRoundForm";
+import HandicapCalculator from "./HandicapCalculator";
 import {
   LineChart,
   Line,
@@ -13,7 +14,6 @@ import {
 } from "recharts";
 import API_URL from "../api";
 
-// Utility to calculate handicap from rounds
 function calcHandicapFromRounds(rounds) {
   const differentials = rounds
     .filter((r) => r.differential !== null && !isNaN(r.differential))
@@ -25,83 +25,6 @@ function calcHandicapFromRounds(rounds) {
   return Number((avg * 0.96).toFixed(2));
 }
 
-// What-If Handicap Calculator
-function WhatIfCalculator({ token, onProject }) {
-  const [score, setScore] = useState("");
-  const [course_rating, setCourseRating] = useState("");
-  const [course_slope, setCourseSlope] = useState("");
-  const [projected, setProjected] = useState(null);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    const res = await axios.post(
-      `${API_URL}/handicap/calculate`,
-      {
-        score,
-        course_rating,
-        course_slope,
-      },
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    );
-    setProjected(res.data.projected_handicap);
-    if (onProject) onProject();
-  };
-
-  return (
-    <div className="bg-blue-50 rounded-xl shadow-inner p-6 flex-1 flex flex-col justify-between min-h-[156px]">
-      <div>
-        <span className="font-semibold text-indigo-700 mb-2 block text-lg">
-          What-If Handicap Calculator
-        </span>
-        <form
-          className="flex flex-row flex-wrap sm:flex-nowrap gap-2 w-full items-end mb-2"
-          onSubmit={submit}
-        >
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-20 flex-shrink"
-            type="number"
-            placeholder="Score"
-            value={score}
-            onChange={(e) => setScore(e.target.value)}
-            required
-          />
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-20 flex-shrink"
-            type="number"
-            step="0.1"
-            placeholder="Rating"
-            value={course_rating}
-            onChange={(e) => setCourseRating(e.target.value)}
-            required
-          />
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-20 flex-shrink"
-            type="number"
-            placeholder="Slope"
-            value={course_slope}
-            onChange={(e) => setCourseSlope(e.target.value)}
-            required
-          />
-          <button
-            type="submit"
-            className="bg-indigo-600 text-white px-4 py-1 rounded-lg border border-indigo-700 shadow-sm hover:bg-indigo-700 transition font-semibold"
-            style={{ minWidth: "70px" }}
-          >
-            Project
-          </button>
-        </form>
-      </div>
-      {projected !== null && (
-        <div className="text-sm text-indigo-800 font-medium">
-          Projected Handicap: <span className="font-bold">{projected}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function Dashboard({ token, onLogout }) {
   const [rounds, setRounds] = useState([]);
   const [handicap, setHandicap] = useState(null);
@@ -109,7 +32,6 @@ export default function Dashboard({ token, onLogout }) {
   const [sortField, setSortField] = useState("date");
   const [sortDirection, setSortDirection] = useState("desc");
 
-  // 1. Define with useCallback and move above useEffect
   const fetchRounds = useCallback(async () => {
     const res = await axios.get(`${API_URL}/rounds`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -131,7 +53,6 @@ export default function Dashboard({ token, onLogout }) {
     setUsername(res.data.username || res.data.email || "Golfer");
   }, [token]);
 
-  // 2. Reference the stable callbacks in useEffect
   useEffect(() => {
     fetchRounds();
     fetchHandicap();
@@ -146,7 +67,6 @@ export default function Dashboard({ token, onLogout }) {
     fetchHandicap();
   };
 
-  // Derived stats
   const roundsWithDifferential = rounds.map((r) => ({
     ...r,
     differential:
@@ -159,28 +79,24 @@ export default function Dashboard({ token, onLogout }) {
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 20);
 
-  // Lowest round ever
   const lowestRound = rounds.reduce(
     (min, r) => (r.score < min.score ? r : min),
-    rounds[0] || {},
+    rounds[0] || {}
   );
-  // Lowest differential ever
   const lowestDiff = roundsWithDifferential.reduce(
     (min, r) =>
       r.differential !== null && r.differential < min.differential ? r : min,
-    roundsWithDifferential[0] || {},
+    roundsWithDifferential[0] || {}
   );
-  // Average differential (last 20)
   const avgDiff =
     last20
       .filter((r) => r.differential !== null)
       .reduce((a, r) => a + r.differential, 0) /
     (last20.filter((r) => r.differential !== null).length || 1);
 
-  // Get last 10 rounds
   const last10 = last20.slice(0, 10);
 
-  // --- Handicap Trend, historical logic ---
+  // Handicap Trend
   const sortedLast10 = [...last10].sort((a, b) => a.date.localeCompare(b.date));
   let trendHandicaps = [];
   let priorRoundsTrend = [];
@@ -234,13 +150,12 @@ export default function Dashboard({ token, onLogout }) {
     return 0;
   });
 
-  // --- Chart Data ---
+  // Chart Data
   const sortedByDate = [...last20].sort((a, b) => a.date.localeCompare(b.date));
   let priorRounds = [];
   const chartData = sortedByDate.map((r) => {
     let handicapBefore;
     if (priorRounds.length === 0) {
-      // For the first round, use its differential as the handicap
       handicapBefore =
         r.differential !== null
           ? Number((r.differential * 0.96).toFixed(2))
@@ -258,7 +173,7 @@ export default function Dashboard({ token, onLogout }) {
     };
   });
 
-  // --- Format date helper ---
+  // Date format helper
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const d = new Date(dateString);
@@ -270,25 +185,25 @@ export default function Dashboard({ token, onLogout }) {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-2 py-8">
+    <div className="max-w-6xl mx-auto px-2 sm:px-6 py-4 sm:py-8">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-indigo-900">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 sm:gap-0">
+        <h1 className="text-2xl font-bold text-indigo-900 text-center sm:text-left">
           Hello, {username}!
         </h1>
         <button
           onClick={onLogout}
-          className="bg-gray-200 rounded px-4 py-1 font-semibold hover:bg-gray-300"
+          className="bg-gray-200 rounded px-6 py-2 font-semibold hover:bg-gray-300 w-full sm:w-auto"
         >
           Log Out
         </button>
       </div>
 
-      {/* Top section: two columns, full height matching */}
-      <div className="flex flex-col md:flex-row gap-6 mb-8 h-[400px]">
-        {/* Left: Stacked stats, stretch to match right */}
+      {/* Top section: Responsive columns */}
+      <div className="flex flex-col md:flex-row gap-6 mb-8 h-auto md:h-[400px]">
+        {/* Left: Stacked stats */}
         <div className="flex flex-col gap-6 min-w-[220px] md:w-[260px] h-full">
-          <div className="bg-indigo-50 rounded-xl shadow-inner p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px]">
+          <div className="bg-indigo-50 rounded-xl shadow-inner p-4 sm:p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px]">
             <span className="text-base text-gray-600 mb-2">
               Current Handicap
             </span>
@@ -296,7 +211,7 @@ export default function Dashboard({ token, onLogout }) {
               {handicap !== null ? handicap : "N/A"}
             </span>
           </div>
-          <div className="bg-green-50 rounded-xl shadow-inner p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px]">
+          <div className="bg-green-50 rounded-xl shadow-inner p-4 sm:p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px]">
             <span className="text-base text-gray-600 mb-1">
               Lowest Round to Par
             </span>
@@ -330,9 +245,9 @@ export default function Dashboard({ token, onLogout }) {
             )}
           </div>
         </div>
-        {/* Right: Add Round + WhatIf stacked, full height */}
+        {/* Right: Add Round + WhatIf stacked */}
         <div className="flex flex-col gap-6 flex-1 h-full">
-          <div className="bg-blue-50 rounded-xl shadow-inner p-6 flex-1 flex flex-col justify-between min-h-[156px]">
+          <div className="bg-blue-50 rounded-xl shadow-inner p-4 sm:p-6 flex-1 flex flex-col justify-between min-h-[156px] overflow-x-auto">
             <AddRoundForm
               token={token}
               onAdd={() => {
@@ -341,12 +256,14 @@ export default function Dashboard({ token, onLogout }) {
               }}
             />
           </div>
-          <WhatIfCalculator token={token} onProject={fetchHandicap} />
+          <div className="bg-blue-50 rounded-xl shadow-inner p-4 sm:p-6 flex-1 flex flex-col justify-between min-h-[156px] overflow-x-auto">
+            <HandicapCalculator token={token} />
+          </div>
         </div>
       </div>
 
       {/* Stats cards */}
-      <div className="grid sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3 my-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 my-8">
         <div className="bg-orange-50 rounded-xl shadow-inner p-4 flex flex-col items-center">
           <span className="text-xs text-gray-600">Total Rounds</span>
           <span className="text-xl font-bold mt-2">{rounds.length}</span>
@@ -411,7 +328,7 @@ export default function Dashboard({ token, onLogout }) {
       </div>
 
       {/* Chart Card */}
-      <div className="bg-white rounded-xl shadow-inner p-6 mb-8">
+      <div className="bg-white rounded-xl shadow-inner p-4 sm:p-6 mb-8">
         <span className="text-base font-semibold text-indigo-800 mb-2 block">
           Score, Differential & Handicap (Last 20 Rounds)
         </span>

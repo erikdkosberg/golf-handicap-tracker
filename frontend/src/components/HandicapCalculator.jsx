@@ -18,7 +18,7 @@ export default function HandicapCalculator({ token }) {
           course_rating: +course_rating,
           course_slope: +course_slope,
         },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       setProjected(res.data.projected_handicap);
     } catch {
@@ -32,11 +32,11 @@ export default function HandicapCalculator({ token }) {
         What-If Handicap Calculator
       </span>
       <form
-        className="flex flex-row items-end gap-2 flex-wrap sm:flex-nowrap w-full"
-        onSubmit={calculate} // use your actual submit handler
+        className="flex flex-wrap gap-2 w-full items-end"
+        onSubmit={calculate}
       >
         <input
-          className="border border-gray-300 rounded px-2 py-1 text-base w-20 flex-shrink"
+          className="border border-gray-300 rounded px-2 py-1 text-base w-full sm:w-24 flex-shrink"
           type="number"
           placeholder="Score"
           value={score}
@@ -44,7 +44,7 @@ export default function HandicapCalculator({ token }) {
           required
         />
         <input
-          className="border border-gray-300 rounded px-2 py-1 text-base w-20 flex-shrink"
+          className="border border-gray-300 rounded px-2 py-1 text-base w-full sm:w-24 flex-shrink"
           type="number"
           step="0.1"
           placeholder="Rating"
@@ -53,7 +53,7 @@ export default function HandicapCalculator({ token }) {
           required
         />
         <input
-          className="border border-gray-300 rounded px-2 py-1 text-base w-20 flex-shrink"
+          className="border border-gray-300 rounded px-2 py-1 text-base w-full sm:w-24 flex-shrink"
           type="number"
           placeholder="Slope"
           value={course_slope}
@@ -62,7 +62,7 @@ export default function HandicapCalculator({ token }) {
         />
         <button
           type="submit"
-          className="bg-emerald-600 text-white px-4 py-1 rounded-lg border border-emerald-700 shadow-sm hover:bg-emerald-700 transition font-semibold"
+          className="bg-emerald-600 text-white px-4 py-1 rounded-lg border border-emerald-700 shadow-sm hover:bg-emerald-700 transition font-semibold w-full sm:w-auto"
           style={{ minWidth: "70px" }}
         >
           Project
