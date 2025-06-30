@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import RoundRow from "./RoundRow";
 import AddRoundForm from "./AddRoundForm";
@@ -109,31 +109,35 @@ export default function Dashboard({ token, onLogout }) {
   const [sortField, setSortField] = useState("date");
   const [sortDirection, setSortDirection] = useState("desc");
 
-  useEffect(() => {
-    fetchRounds();
-    fetchHandicap();
-    fetchUsername();
-  }, []);
-
-  const fetchRounds = async () => {
+  // 1. Define with useCallback and move above useEffect
+  const fetchRounds = useCallback(async () => {
     const res = await axios.get(`${API_URL}/rounds`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setRounds(res.data);
-  };
+  }, [token]);
 
-  const fetchHandicap = async () => {
+  const fetchHandicap = useCallback(async () => {
     const res = await axios.get(`${API_URL}/handicap`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setHandicap(res.data.handicap);
-  };
-  const fetchUsername = async () => {
+  }, [token]);
+
+  const fetchUsername = useCallback(async () => {
     const res = await axios.get(`${API_URL}/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setUsername(res.data.username || res.data.email || "Golfer");
-  };
+  }, [token]);
+
+  // 2. Reference the stable callbacks in useEffect
+  useEffect(() => {
+    fetchRounds();
+    fetchHandicap();
+    fetchUsername();
+  }, [fetchRounds, fetchHandicap, fetchUsername]);
+
   const handleDelete = async (id) => {
     await axios.delete(`${API_URL}/rounds/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
