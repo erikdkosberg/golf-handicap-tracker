@@ -123,7 +123,6 @@ export default function AddRoundForm({ token, onAdd }) {
             list="tees-list"
             autoComplete="off"
             required
-            disabled={!course}
           />
           <datalist id="tees-list">
             {uniqueTees.map((t, i) => (
