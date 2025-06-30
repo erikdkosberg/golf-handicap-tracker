@@ -1,0 +1,6 @@
+.env
+data.json
+instance/
+zappa_settings.json
+env/
+__pycache__/

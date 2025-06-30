@@ -4,3 +4,5 @@ flask_cors
 PyJWT
 Werkzeug
 gunicorn
+python-dotenv
+psycopg2-binary
