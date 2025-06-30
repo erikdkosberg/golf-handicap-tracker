@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import API_URL from "../api";
 
 export default function HandicapCalculator({ token }) {
   const [score, setScore] = useState("");
@@ -11,7 +12,7 @@ export default function HandicapCalculator({ token }) {
     e.preventDefault();
     try {
       const res = await axios.post(
-        "http://localhost:5050/handicap/calculate",
+        `${API_URL}/handicap/calculate`,
         {
           score: +score,
           course_rating: +course_rating,

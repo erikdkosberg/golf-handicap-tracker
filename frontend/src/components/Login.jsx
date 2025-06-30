@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import API_URL from "../api";
 
 export default function Login({ onLogin, switchToRegister }) {
   const [email, setEmail] = useState("");
@@ -9,7 +10,7 @@ export default function Login({ onLogin, switchToRegister }) {
   const submit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://localhost:5050/login", {
+      const res = await axios.post(`${API_URL}/login`, {
         email,
         password,
       });

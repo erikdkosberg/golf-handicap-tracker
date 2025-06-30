@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import API_URL from "../api";
 
 export default function RoundRow({
   round,
@@ -15,7 +16,7 @@ export default function RoundRow({
     setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSave = async () => {
-    await axios.put(`http://localhost:5050/rounds/${round.id}`, form, {
+    await axios.put(`${API_URL}/rounds/${round.id}`, form, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setEdit(false);

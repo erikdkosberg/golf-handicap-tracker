@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import API_URL from "../api";
 
 // Utility to calculate handicap from rounds
 function calcHandicapFromRounds(rounds) {
@@ -34,7 +35,7 @@ function WhatIfCalculator({ token, onProject }) {
   const submit = async (e) => {
     e.preventDefault();
     const res = await axios.post(
-      "http://localhost:5050/handicap/calculate",
+      `${API_URL}/handicap/calculate`,
       {
         score,
         course_rating,
@@ -115,26 +116,26 @@ export default function Dashboard({ token, onLogout }) {
   }, []);
 
   const fetchRounds = async () => {
-    const res = await axios.get("http://localhost:5050/rounds", {
+    const res = await axios.get(`${API_URL}/rounds`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setRounds(res.data);
   };
 
   const fetchHandicap = async () => {
-    const res = await axios.get("http://localhost:5050/handicap", {
+    const res = await axios.get(`${API_URL}/handicap`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setHandicap(res.data.handicap);
   };
   const fetchUsername = async () => {
-    const res = await axios.get("http://localhost:5050/me", {
+    const res = await axios.get(`${API_URL}/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setUsername(res.data.username || res.data.email || "Golfer");
   };
   const handleDelete = async (id) => {
-    await axios.delete(`http://localhost:5050/rounds/${id}`, {
+    await axios.delete(`${API_URL}/rounds/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     fetchRounds();

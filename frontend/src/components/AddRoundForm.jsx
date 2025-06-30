@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import API_URL from "../api";
 
 export default function AddRoundForm({ token, onAdd }) {
   const [score, setScore] = useState("");
@@ -14,7 +15,7 @@ export default function AddRoundForm({ token, onAdd }) {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5050/courses", {
+      .get(`${API_URL}/courses`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => setCourses(res.data));
@@ -43,7 +44,7 @@ export default function AddRoundForm({ token, onAdd }) {
   const submit = async (e) => {
     e.preventDefault();
     await axios.post(
-      "http://localhost:5050/rounds",
+      `${API_URL}/rounds`,
       {
         score,
         course_rating,
