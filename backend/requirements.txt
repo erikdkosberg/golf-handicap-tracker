@@ -1,13 +1,13 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
-PyJWT
+PyJWT==2.8.0
 Werkzeug
 gunicorn
 python-dotenv
-psycopg2-binary
+psycopg2-binary==2.9.9
 google-auth-oauthlib
 google-api-python-client
 beautifulsoup4
-lxml
 mangum
+cryptography==41.0.7

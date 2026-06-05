@@ -84,7 +84,7 @@ def parse_golfshot_email(eml_bytes, player_name):
             break
     if not html:
         return None
-    soup = BeautifulSoup(html, "lxml")
+    soup = BeautifulSoup(html, "html.parser")
     try:
         info_cells = soup.find_all("td", {"valign": "top", "height": "25"})
         course_name = (
