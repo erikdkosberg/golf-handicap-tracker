@@ -77,6 +77,28 @@ async def http_exception_handler(request, exc):
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    _ensure_user_columns()
+
+
+def _ensure_user_columns():
+    """Add Gmail sync columns to existing deployments (create_all won't alter tables)."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "user" not in inspector.get_table_names():
+        return
+
+    existing = {col["name"] for col in inspector.get_columns("user")}
+    additions = {
+        "google_refresh_token": "TEXT",
+        "google_email": "VARCHAR(120)",
+        "last_golfshot_sync": "TIMESTAMP",
+        "last_golfshot_sync_message": "BIGINT",
+    }
+    with engine.begin() as conn:
+        for column, col_type in additions.items():
+            if column not in existing:
+                conn.execute(text(f'ALTER TABLE "user" ADD COLUMN {column} {col_type}'))
 
 
 def parse_date(value):
@@ -648,3 +670,11 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("app:app", host="0.0.0.0", port=5050, reload=True)
+
+
+try:
+    from mangum import Mangum
+
+    handler = Mangum(app)
+except ImportError:
+    handler = None

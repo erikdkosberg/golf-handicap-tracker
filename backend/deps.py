@@ -8,13 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User
 
-_db_url = os.environ.get("DATABASE_URL", "sqlite:///golf.db")
-SECRET_KEY = os.environ.get("SECRET_KEY")
-if not SECRET_KEY:
-    if _db_url.startswith("sqlite"):
-        SECRET_KEY = "dev-only-insecure-key"
-    else:
-        raise RuntimeError("SECRET_KEY environment variable must be set in production")
+SECRET_KEY = os.environ.get("SECRET_KEY", "changeme")
 security = HTTPBearer(auto_error=False)
 
 
