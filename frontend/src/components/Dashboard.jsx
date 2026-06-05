@@ -1,124 +1,262 @@
+// src/components/Dashboard.jsx
+
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import RoundRow from "./RoundRow";
 import AddRoundForm from "./AddRoundForm";
 import HandicapCalculator from "./HandicapCalculator";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
+import { ScoreHandicapChart } from "./ScoreHandicapChart";
+import { StatCard, TrendCard } from "./StatCards";
+import { formatDate } from "../utilities/utility";
 import API_URL from "../api";
+import SyncProgressBar from "./SyncProgressBar";
 
-function calcHandicapFromRounds(rounds) {
-  const differentials = rounds
-    .filter((r) => r.differential !== null && !isNaN(r.differential))
-    .map((r) => r.differential)
-    .sort((a, b) => a - b);
-  if (!differentials.length) return null;
-  const count = Math.min(8, differentials.length);
-  const avg = differentials.slice(0, count).reduce((a, b) => a + b, 0) / count;
-  return Number((avg * 0.96).toFixed(2));
+// --------- Modal Component -----------
+function Modal({ open, title, children, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="fixed z-40 inset-0 flex items-center justify-center bg-black bg-opacity-40">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4">{title}</h2>
+        {children}
+        <button
+          onClick={onClose}
+          className="mt-6 bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
 }
 
+// --------- Link Gmail Button -----------
+function LinkGmailButton({ token, disabled }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleLink = async () => {
+    setLoading(true);
+    const res = await axios.get(`${API_URL}/auth/google`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    window.location.href = res.data.auth_url;
+  };
+
+  return (
+    <button
+      onClick={handleLink}
+      disabled={loading || disabled}
+      className={`${
+        disabled ? "bg-gray-300 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+      } text-white px-6 py-2 rounded-lg shadow font-semibold transition`}
+    >
+      {disabled ? "Gmail Linked" : loading ? "Redirecting..." : "Link Gmail"}
+    </button>
+  );
+}
+
+
+function SyncGolfshotButton({ token, onSync, disabled, defaultPlayerName }) {
+  const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [foundCount, setFoundCount] = useState(0);
+  const [imported, setImported] = useState(null);
+  const [error, setError] = useState(null);
+  const [playerName, setPlayerName] = useState(defaultPlayerName || "");
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [totalCount, setTotalCount] = useState(null);
+  const [askName, setAskName] = useState(false);
+
+  const handlePreview = async () => {
+    setAskName(true);
+  };
+
+  const doPreview = async () => {
+    setLoading(true);
+    setImported(null);
+    setError(null);
+    try {
+      const res = await axios.post(
+        `${API_URL}/gmail/sync?dry_run=1`,
+        { player_name: playerName },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setFoundCount(res.data.found || 0);
+      setTotalCount(res.data.total || null);
+      setModalOpen(true);
+      if (res.data.error) {
+        setError(res.data.error);
+      } else if (res.data.found > 0) {
+        setFoundCount(res.data.found);
+        setModalOpen(true);
+      } else {
+        setImported(0);
+      }
+    } catch (err) {
+      setError("Sync failed.");
+    }
+    setLoading(false);
+    setAskName(false);
+  };
+
+  const handleImport = async () => {
+    setLoading(true);
+    setModalOpen(false);
+    try {
+      setIsSyncing(true);
+
+      const res = await axios.post(
+        `${API_URL}/gmail/sync`,
+        { player_name: playerName },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setIsSyncing(false);
+      setImported(res.data.imported || 0);
+      if (onSync) onSync();
+    } catch (err) {
+      setError("Import failed.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="my-1">
+      <SyncProgressBar token={token} isSyncing={isSyncing} onFinish={() => setIsSyncing(false)} />
+
+      <button
+        onClick={handlePreview}
+        disabled={loading || disabled}
+        className={`${
+          disabled
+            ? "bg-gray-300 cursor-not-allowed"
+            : "bg-blue-600 hover:bg-blue-700"
+        } text-white px-6 py-2 rounded-lg shadow font-semibold transition`}
+        title={disabled ? "Link Gmail first to enable sync." : ""}
+      >
+        {loading ? "Checking..." : "Sync Golfshot"}
+      </button>
+      {askName && (
+        <div className="fixed z-50 inset-0 flex items-center justify-center bg-black bg-opacity-30">
+          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Enter your name as it appears on the scorecard</h2>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              placeholder="e.g. Erik"
+              className="border p-2 rounded w-full mb-4"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={doPreview}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold"
+                disabled={!playerName}
+              >
+                Continue
+              </button>
+              <button
+                onClick={() => setAskName(false)}
+                className="bg-gray-200 px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <Modal
+        open={modalOpen}
+        title="Import Golfshot Rounds"
+        onClose={() => setModalOpen(false)}
+      >
+        <div className="mb-4">
+          {foundCount} new round{foundCount !== 1 ? "s" : ""} found for "{playerName}"
+          {totalCount !== null && (
+            <> (out of {totalCount} Golfshot emails scanned)</>
+          )}
+          . Import them?
+        </div>
+        <button
+          onClick={handleImport}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold mr-3"
+        >
+          Yes, Import
+        </button>
+      </Modal>
+
+      {disabled && (
+        <div className="text-sm text-gray-500 mt-1">Link your Gmail account to enable syncing.</div>
+      )}
+      {!disabled && error && <div className="text-red-600 mt-2">{error}</div>}
+      {!disabled && imported !== null && (
+        <div className="mt-2 text-green-700 font-medium">
+          {imported === 0
+            ? "No new rounds to import."
+            : `Successfully imported ${imported} round${imported !== 1 ? "s" : ""}!`}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// --------- Main Dashboard -----------
 export default function Dashboard({ token, onLogout }) {
   const [rounds, setRounds] = useState([]);
-  const [handicap, setHandicap] = useState(null);
+  const [handicapData, setHandicapData] = useState(null);
   const [username, setUsername] = useState("Golfer");
   const [sortField, setSortField] = useState("date");
   const [sortDirection, setSortDirection] = useState("desc");
+  const [gmailLinked, setGmailLinked] = useState(false);
 
-  const fetchRounds = useCallback(async () => {
-    const res = await axios.get(`${API_URL}/rounds`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setRounds(res.data);
-  }, [token]);
-
-  const fetchHandicap = useCallback(async () => {
-    const res = await axios.get(`${API_URL}/handicap`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setHandicap(res.data.handicap);
-  }, [token]);
-
-  const fetchUsername = useCallback(async () => {
-    const res = await axios.get(`${API_URL}/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setUsername(res.data.username || res.data.email || "Golfer");
-  }, [token]);
+  const fetchData = useCallback(async () => {
+    if (!token) {
+      onLogout();
+      return;
+    }
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [roundsRes, handicapRes, meRes] = await Promise.all([
+        axios.get(`${API_URL}/rounds`, { headers }),
+        axios.get(`${API_URL}/handicap`, { headers }),
+        axios.get(`${API_URL}/me`, { headers }),
+      ]);
+      setRounds(roundsRes.data);
+      setHandicapData(handicapRes.data);
+      setUsername(meRes.data.username || meRes.data.email || "Golfer");
+      setGmailLinked(meRes.data.gmail_linked || false);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        onLogout();
+      }
+    }
+  }, [token, onLogout]);
 
   useEffect(() => {
-    fetchRounds();
-    fetchHandicap();
-    fetchUsername();
-  }, [fetchRounds, fetchHandicap, fetchUsername]);
+    fetchData();
+  }, [fetchData]);
 
   const handleDelete = async (id) => {
     await axios.delete(`${API_URL}/rounds/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    fetchRounds();
-    fetchHandicap();
+    fetchData();
   };
 
-  const roundsWithDifferential = rounds.map((r) => ({
-    ...r,
-    differential:
-      r.course_slope && r.course_rating
-        ? ((r.score - r.course_rating) * 113) / r.course_slope
-        : null,
+  const handicap = handicapData?.handicap ?? null;
+  const stats = handicapData?.stats ?? {};
+  const lowestRoundToPar = handicapData?.lowest_round_to_par;
+  const chartData = (handicapData?.chart_data ?? []).map((d) => ({
+    date: d.date,
+    Score: d.score,
+    Differential: d.differential,
+    Handicap: d.handicap,
   }));
+  const highlightRoundIds = new Set(handicapData?.highlighted_round_ids ?? []);
+  const improvementCutoff = handicapData?.improvement_cutoff;
 
-  const last20 = [...roundsWithDifferential]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 20);
-
-  const lowestRound = rounds.reduce(
-    (min, r) => (r.score < min.score ? r : min),
-    rounds[0] || {}
-  );
-  const lowestDiff = roundsWithDifferential.reduce(
-    (min, r) =>
-      r.differential !== null && r.differential < min.differential ? r : min,
-    roundsWithDifferential[0] || {}
-  );
-  const avgDiff =
-    last20
-      .filter((r) => r.differential !== null)
-      .reduce((a, r) => a + r.differential, 0) /
-    (last20.filter((r) => r.differential !== null).length || 1);
-
-  const last10 = last20.slice(0, 10);
-
-  // Handicap Trend
-  const sortedLast10 = [...last10].sort((a, b) => a.date.localeCompare(b.date));
-  let trendHandicaps = [];
-  let priorRoundsTrend = [];
-  sortedLast10.forEach((r) => {
-    let handicapAtTime;
-    if (priorRoundsTrend.length === 0) {
-      handicapAtTime =
-        r.differential !== null
-          ? Number((r.differential * 0.96).toFixed(2))
-          : null;
-    } else {
-      handicapAtTime = calcHandicapFromRounds(priorRoundsTrend);
-    }
-    trendHandicaps.push(handicapAtTime);
-    priorRoundsTrend = [...priorRoundsTrend, r];
-  });
-  const handicapTrend =
-    trendHandicaps.length > 1
-      ? trendHandicaps[trendHandicaps.length - 1] - trendHandicaps[0]
-      : null;
-
-  // Sorting
   const handleSort = (field) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -127,7 +265,8 @@ export default function Dashboard({ token, onLogout }) {
       setSortDirection("asc");
     }
   };
-  const sortedRounds = [...roundsWithDifferential].sort((a, b) => {
+
+  const sortedRounds = [...rounds].sort((a, b) => {
     let aVal = a[sortField];
     let bVal = b[sortField];
     if (
@@ -138,10 +277,15 @@ export default function Dashboard({ token, onLogout }) {
         "yardage",
         "par",
         "differential",
+        "hole_count",
       ].includes(sortField)
     ) {
       aVal = Number(aVal);
       bVal = Number(bVal);
+    }
+    if (sortField === "has_hole_by_hole") {
+      aVal = a.has_hole_by_hole ? 1 : 0;
+      bVal = b.has_hole_by_hole ? 1 : 0;
     }
     if (aVal === undefined) aVal = "";
     if (bVal === undefined) bVal = "";
@@ -150,43 +294,24 @@ export default function Dashboard({ token, onLogout }) {
     return 0;
   });
 
-  // Chart Data
-  const sortedByDate = [...last20].sort((a, b) => a.date.localeCompare(b.date));
-  let priorRounds = [];
-  const chartData = sortedByDate.map((r) => {
-    let handicapBefore;
-    if (priorRounds.length === 0) {
-      handicapBefore =
-        r.differential !== null
-          ? Number((r.differential * 0.96).toFixed(2))
-          : null;
-    } else {
-      handicapBefore = calcHandicapFromRounds(priorRounds);
-    }
-    priorRounds = [...priorRounds, r];
-    return {
-      date: r.date,
-      Score: r.score,
-      Differential:
-        r.differential !== null ? Number(r.differential.toFixed(2)) : null,
-      Handicap: handicapBefore,
-    };
-  });
-
-  // Date format helper
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    const d = new Date(dateString);
-    return d.toLocaleDateString("en-US", {
-      month: "2-digit",
-      day: "2-digit",
-      year: "numeric",
-    });
+  const formatToPar = (roundInfo) => {
+    if (!roundInfo) return "N/A";
+    const diff = roundInfo.to_par;
+    if (diff === 0) return `${roundInfo.score} (E)`;
+    return `${roundInfo.score} (${diff > 0 ? "+" : ""}${diff})`;
   };
 
   return (
     <div className="max-w-6xl mx-auto px-2 sm:px-6 py-4 sm:py-8">
-      {/* Header */}
+      <div className="flex gap-4 mb-6">
+        <LinkGmailButton token={token} disabled={gmailLinked} />
+        <SyncGolfshotButton
+          token={token}
+          disabled={!gmailLinked}
+          onSync={fetchData}
+        />
+      </div>
+
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 sm:gap-0">
         <h1 className="text-2xl font-bold text-indigo-900 text-center sm:text-left">
           Hello, {username}!
@@ -199,290 +324,176 @@ export default function Dashboard({ token, onLogout }) {
         </button>
       </div>
 
-      {/* Top section: Responsive columns */}
       <div className="flex flex-col md:flex-row gap-6 mb-8 h-auto md:h-[400px]">
-        {/* Left: Stacked stats */}
         <div className="flex flex-col gap-6 min-w-[220px] md:w-[260px] h-full">
           <div className="bg-indigo-50 rounded-xl shadow-inner p-4 sm:p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px]">
-            <span className="text-base text-gray-600 mb-2">
-              Current Handicap
-            </span>
+            <span className="text-base text-gray-600 mb-2">Current Handicap</span>
             <span className="text-3xl font-bold">
               {handicap !== null ? handicap : "N/A"}
             </span>
           </div>
           <div className="bg-green-50 rounded-xl shadow-inner p-4 sm:p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px]">
-            <span className="text-base text-gray-600 mb-1">
-              Lowest Round to Par
-            </span>
+            <span className="text-base text-gray-600 mb-1">Lowest Round to Par</span>
             <span className="text-3xl font-bold mb-1">
-              {lowestRound
-                ? (() => {
-                    if (
-                      typeof lowestRound.par === "number" &&
-                      lowestRound.par
-                    ) {
-                      const diff = lowestRound.score - lowestRound.par;
-                      if (diff === 0) return `${lowestRound.score} (E)`;
-                      return `${lowestRound.score} (${diff > 0 ? "+" : ""}${diff})`;
-                    }
-                    return lowestRound.score;
-                  })()
-                : "N/A"}
+              {formatToPar(lowestRoundToPar)}
             </span>
-            {lowestRound && (
+            {lowestRoundToPar && (
               <div className="text-xs text-gray-600 text-center mt-1">
-                {lowestRound.date ? (
-                  <>{formatDate(lowestRound.date)} &middot; </>
+                {lowestRoundToPar.date ? (
+                  <>{formatDate(lowestRoundToPar.date)} &middot; </>
                 ) : null}
-                {lowestRound.course && (
+                {lowestRoundToPar.course && (
                   <>
-                    {lowestRound.course}
-                    {lowestRound.tees ? ` (${lowestRound.tees})` : ""}
+                    {lowestRoundToPar.course}
+                    {lowestRoundToPar.tees ? ` (${lowestRoundToPar.tees})` : ""}
                   </>
                 )}
               </div>
             )}
           </div>
         </div>
-        {/* Right: Add Round + WhatIf stacked */}
         <div className="flex flex-col gap-6 flex-1 h-full">
           <div className="bg-blue-50 rounded-xl shadow-inner p-4 sm:p-6 flex-1 flex flex-col justify-between min-h-[156px] overflow-x-auto">
             <AddRoundForm
               token={token}
-              onAdd={() => {
-                fetchRounds();
-                fetchHandicap();
-              }}
+              onAdd={fetchData}
             />
           </div>
           <div className="bg-blue-50 rounded-xl shadow-inner p-4 sm:p-6 flex-1 flex flex-col justify-between min-h-[156px] overflow-x-auto">
-            <HandicapCalculator token={token} />
+            <HandicapCalculator
+              token={token}
+              improvementCutoff={improvementCutoff}
+            />
           </div>
         </div>
       </div>
 
-      {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 my-8">
-        <div className="bg-orange-50 rounded-xl shadow-inner p-4 flex flex-col items-center">
-          <span className="text-xs text-gray-600">Total Rounds</span>
-          <span className="text-xl font-bold mt-2">{rounds.length}</span>
-        </div>
-        <div className="bg-blue-50 rounded-xl shadow-inner p-4 flex flex-col items-center">
-          <span className="text-xs text-gray-600">Lowest Differential</span>
-          <span className="text-xl font-bold mt-2">
-            {lowestDiff && lowestDiff.differential !== undefined
-              ? lowestDiff.differential.toFixed(1)
-              : "N/A"}
-          </span>
-        </div>
-        <div className="bg-yellow-50 rounded-xl shadow-inner p-4 flex flex-col items-center">
-          <span className="text-xs text-gray-600">
-            Average Differential (20)
-          </span>
-          <span className="text-xl font-bold mt-2">
-            {avgDiff && !isNaN(avgDiff) ? avgDiff.toFixed(1) : "N/A"}
-          </span>
-        </div>
-        <div className="bg-lime-50 rounded-xl shadow-inner p-4 flex flex-col items-center">
-          <span className="text-xs text-gray-600">Handicap Trend (10)</span>
-          <span
-            className={`text-xl font-bold mt-2 flex items-center ${handicapTrend > 0 ? "text-red-700" : "text-green-700"}`}
-          >
-            {handicapTrend !== null ? (
-              <>
-                {handicapTrend > 0 ? (
-                  <svg
-                    width={18}
-                    height={18}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 19V5M5 12l7-7 7 7" />
-                  </svg>
-                ) : (
-                  <svg
-                    width={18}
-                    height={18}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 5v14M19 12l-7 7-7-7" />
-                  </svg>
-                )}
-                {Math.abs(handicapTrend).toFixed(2)}
-              </>
-            ) : (
-              "N/A"
-            )}
-          </span>
-        </div>
+        <StatCard label="Total Rounds" value={stats.total_rounds ?? rounds.length} colorClass="bg-orange-50" />
+        <StatCard
+          label="Lowest Differential"
+          value={
+            stats.lowest_differential != null
+              ? stats.lowest_differential.toFixed(1)
+              : "N/A"
+          }
+          colorClass="bg-blue-50"
+        />
+        <StatCard
+          label="Average Differential (20)"
+          value={
+            stats.average_differential_20 != null
+              ? stats.average_differential_20.toFixed(1)
+              : "N/A"
+          }
+          colorClass="bg-yellow-50"
+        />
+        <TrendCard
+          label="Handicap Trend (10)"
+          value={
+            stats.handicap_trend_10 != null
+              ? Math.abs(stats.handicap_trend_10).toFixed(2)
+              : "N/A"
+          }
+          trend={stats.handicap_trend_10}
+        />
+
+        <StatCard
+          label="Avg Birdies/Round"
+          value={stats.avg_birdies ?? "N/A"}
+          colorClass="bg-green-50"
+        />
+        <StatCard
+          label="Avg Pars/Round"
+          value={stats.avg_pars ?? "N/A"}
+          colorClass="bg-indigo-50"
+        />
+        <StatCard
+          label="Avg Bogeys/Round"
+          value={stats.avg_bogeys ?? "N/A"}
+          colorClass="bg-yellow-100"
+        />
+        <StatCard
+          label="Avg Dbl+ Bogey/Round"
+          value={stats.avg_double_or_worse ?? "N/A"}
+          colorClass="bg-rose-50"
+        />
       </div>
 
-      {/* Chart Card */}
-      <div className="bg-white rounded-xl shadow-inner p-4 sm:p-6 mb-8">
-        <span className="text-base font-semibold text-indigo-800 mb-2 block">
-          Score, Differential & Handicap (Last 20 Rounds)
-        </span>
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={chartData}>
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-            <YAxis
-              yAxisId="left"
-              label={{
-                value: "Score",
-                angle: -90,
-                position: "insideLeft",
-                fontSize: 12,
-              }}
-              tick={{ fontSize: 11 }}
-              width={40}
-            />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              label={{
-                value: "Handicap / Diff",
-                angle: 90,
-                position: "insideRight",
-                fontSize: 12,
-              }}
-              tick={{ fontSize: 11 }}
-              width={40}
-            />
-            <Tooltip />
-            <Legend />
-            <Line
-              type="linear"
-              dataKey="Score"
-              yAxisId="left"
-              stroke="#6366f1"
-              dot={false}
-              strokeWidth={2}
-            />
-            <Line
-              type="linear"
-              dataKey="Handicap"
-              yAxisId="right"
-              stroke="#a21caf"
-              dot={false}
-              strokeWidth={2}
-            />
-            <Line
-              type="linear"
-              dataKey="Differential"
-              yAxisId="right"
-              stroke="#22c55e"
-              dot={false}
-              strokeWidth={2}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      <ScoreHandicapChart chartData={chartData} />
 
-      {/* Past Rounds Table */}
       <div className="mb-12">
         <div className="text-lg font-semibold mb-2">Past Rounds</div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr>
-                <th
-                  className="text-center cursor-pointer select-none"
-                  onClick={() => handleSort("date")}
-                >
-                  Date{" "}
-                  {sortField === "date" &&
-                    (sortDirection === "asc" ? "▲" : "▼")}
-                </th>
-                <th
-                  className="text-center cursor-pointer select-none"
-                  onClick={() => handleSort("score")}
-                >
-                  Score{" "}
-                  {sortField === "score" &&
-                    (sortDirection === "asc" ? "▲" : "▼")}
-                </th>
-                <th
-                  className="text-center cursor-pointer select-none"
-                  onClick={() => handleSort("course_rating")}
-                >
-                  Rating{" "}
-                  {sortField === "course_rating" &&
-                    (sortDirection === "asc" ? "▲" : "▼")}
-                </th>
-                <th
-                  className="text-center cursor-pointer select-none"
-                  onClick={() => handleSort("course_slope")}
-                >
-                  Slope{" "}
-                  {sortField === "course_slope" &&
-                    (sortDirection === "asc" ? "▲" : "▼")}
-                </th>
-                <th
-                  className="text-center cursor-pointer select-none"
-                  onClick={() => handleSort("course")}
-                >
-                  Course{" "}
-                  {sortField === "course" &&
-                    (sortDirection === "asc" ? "▲" : "▼")}
-                </th>
-                <th
-                  className="text-center cursor-pointer select-none"
-                  onClick={() => handleSort("tees")}
-                >
-                  Tees{" "}
-                  {sortField === "tees" &&
-                    (sortDirection === "asc" ? "▲" : "▼")}
-                </th>
-                <th
-                  className="text-center cursor-pointer select-none"
-                  onClick={() => handleSort("yardage")}
-                >
-                  Yardage{" "}
-                  {sortField === "yardage" &&
-                    (sortDirection === "asc" ? "▲" : "▼")}
-                </th>
-                <th
-                  className="text-center cursor-pointer select-none"
-                  onClick={() => handleSort("par")}
-                >
-                  Par{" "}
-                  {sortField === "par" && (sortDirection === "asc" ? "▲" : "▼")}
-                </th>
-                <th
-                  className="text-center cursor-pointer select-none"
-                  onClick={() => handleSort("differential")}
-                >
-                  Differential{" "}
-                  {sortField === "differential" &&
-                    (sortDirection === "asc" ? "▲" : "▼")}
-                </th>
+                {[
+                  { label: "Date", field: "date" },
+                  { label: "Score", field: "score" },
+                  { label: "Holes", field: "hole_count" },
+                  { label: "Rating", field: "course_rating" },
+                  { label: "Slope", field: "course_slope" },
+                  { label: "Course", field: "course" },
+                  { label: "Tees", field: "tees" },
+                  { label: "Yardage", field: "yardage" },
+                  { label: "Par", field: "par" },
+                  { label: "Differential", field: "differential" },
+                  { label: "Hole Data", field: "has_hole_by_hole" },
+                ].map(({ label, field }) => (
+                  <th
+                    key={field}
+                    className="text-center cursor-pointer select-none"
+                    onClick={() => handleSort(field)}
+                  >
+                    {label}{" "}
+                    {sortField === field &&
+                      (sortDirection === "asc" ? "▲" : "▼")}
+                  </th>
+                ))}
                 <th className="text-center">Action</th>
               </tr>
             </thead>
             <tbody>
-              {sortedRounds.map((r) => (
-                <RoundRow
-                  key={r.id}
-                  round={{ ...r, date: formatDate(r.date) }}
-                  token={token}
-                  onUpdate={() => {
-                    fetchRounds();
-                    fetchHandicap();
-                  }}
-                  onDelete={handleDelete}
-                  differential={r.differential}
-                />
-              ))}
+              {sortedRounds.map((r, idx) => {
+                const isTop20 = sortField === "date" && sortDirection === "desc" && idx < 20;
+                const isHighlighted = isTop20 && highlightRoundIds.has(r.id);
+                const isHandicapCutoff =
+                  sortField === "date" &&
+                  sortDirection === "desc" &&
+                  idx === 19;
+
+                return (
+                  <React.Fragment key={r.id}>
+                    <RoundRow
+                      round={{ ...r, date: formatDate(r.date) }}
+                      token={token}
+                      onUpdate={fetchData}
+                      onDelete={handleDelete}
+                      differential={
+                        typeof r.differential === "number" && !isNaN(r.differential)
+                          ? r.differential
+                          : "N/A"
+                      }
+                      highlight={isHighlighted}
+                    />
+                    {isHandicapCutoff && (
+                      <tr>
+                        <td colSpan={12}>
+                          <div
+                            style={{
+                              borderTop: "2px dotted green",
+                              margin: "0 0 0 0",
+                              height: "0.5rem",
+                            }}
+                            title="Rounds above the line are used in your current handicap"
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

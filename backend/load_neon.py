@@ -1,39 +1,37 @@
-# load_to_neon.py
-import json
-from app import db, User, Round, app  # Adjust imports as needed
-
 import datetime
+import json
+
+from database import SessionLocal, engine, Base
+from models import Round, User
 
 
 def load_data():
-    with open("data.json") as f:
-        data = json.load(f)
+    db = SessionLocal()
+    try:
+        with open("data.json") as f:
+            data = json.load(f)
 
-    # Import users (as before)
-    for u in data["users"]:
-        u.pop("id", None)
-        if not User.query.filter_by(email=u["email"]).first():
-            db.session.add(User(**u))
-    db.session.commit()
+        for u in data["users"]:
+            u.pop("id", None)
+            if not db.query(User).filter_by(email=u["email"]).first():
+                db.add(User(**u))
+        db.commit()
 
-    # Map emails to user IDs (if you need to remap user_id references)
-    email_to_user = {u.email: u.id for u in User.query.all()}
-
-    # Import rounds
-    for r in data["rounds"]:
-        r.pop("id", None)
-        # Convert date string to date object
-        if isinstance(r["date"], str):
-            try:
-                r["date"] = datetime.datetime.strptime(r["date"], "%Y-%m-%d").date()
-            except Exception:
-                r["date"] = None
-        # (Optional: remap user_id if user IDs changed)
-        db.session.add(Round(**r))
-    db.session.commit()
+        for r in data["rounds"]:
+            r.pop("id", None)
+            if isinstance(r["date"], str):
+                try:
+                    r["date"] = datetime.datetime.strptime(
+                        r["date"], "%Y-%m-%d"
+                    ).date()
+                except Exception:
+                    r["date"] = None
+            db.add(Round(**r))
+        db.commit()
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()  # Create tables if they don't exist
-        load_data()
+    Base.metadata.create_all(bind=engine)
+    load_data()

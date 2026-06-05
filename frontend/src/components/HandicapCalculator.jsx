@@ -2,11 +2,12 @@ import React, { useState } from "react";
 import axios from "axios";
 import API_URL from "../api";
 
-export default function HandicapCalculator({ token }) {
+export default function HandicapCalculator({ token, improvementCutoff }) {
   const [score, setScore] = useState("");
   const [course_rating, setCourseRating] = useState("");
   const [course_slope, setCourseSlope] = useState("");
   const [projected, setProjected] = useState(null);
+  const [differential, setDifferential] = useState(null);
 
   const calculate = async (e) => {
     e.preventDefault();
@@ -21,8 +22,10 @@ export default function HandicapCalculator({ token }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setProjected(res.data.projected_handicap);
+      setDifferential(res.data.projected_differential);
     } catch {
       setProjected("Error");
+      setDifferential(null);
     }
   };
 
@@ -71,6 +74,15 @@ export default function HandicapCalculator({ token }) {
       {projected !== null && (
         <span className="block text-emerald-700 mt-2">
           Projected Handicap: {projected}
+          {differential !== null && (
+            <> &nbsp;&middot;&nbsp; Differential: {Number(differential).toFixed(1)}</>
+          )}
+        </span>
+      )}
+      {improvementCutoff !== null && improvementCutoff !== undefined && (
+        <span className="block text-yellow-700 mt-2">
+          To improve your handicap, your next round must have a differential lower than{" "}
+          <b>{Number(improvementCutoff).toFixed(1)}</b>
         </span>
       )}
     </>

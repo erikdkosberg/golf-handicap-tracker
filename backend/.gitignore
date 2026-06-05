@@ -4,4 +4,7 @@ instance/
 zappa_settings.json
 env/
 __pycache__/
+*.pyc
+*.db
 .DS_Store
+client_secret.json
