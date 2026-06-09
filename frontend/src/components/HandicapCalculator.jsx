@@ -1,30 +1,80 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import API_URL from "../api";
 
-export default function HandicapCalculator({ token, improvementCutoff }) {
+const STANDARD_RATING = 72.0;
+const STANDARD_SLOPE = 113;
+const STANDARD_PAR = 72;
+
+export default function HandicapCalculator({
+  token,
+  handicap,
+  improvementCutoff,
+  maintainCutoff,
+  calculatorDefaults,
+}) {
   const [score, setScore] = useState("");
   const [course_rating, setCourseRating] = useState("");
   const [course_slope, setCourseSlope] = useState("");
   const [projected, setProjected] = useState(null);
   const [differential, setDifferential] = useState(null);
+  const defaultsApplied = useRef(false);
+
+  useEffect(() => {
+    if (defaultsApplied.current) return;
+
+    const defaults = calculatorDefaults || {};
+    const hasDefaults =
+      defaults.score != null ||
+      handicap != null ||
+      defaults.course_rating != null ||
+      defaults.course_slope != null;
+
+    if (!hasDefaults) return;
+
+    if (defaults.score != null) {
+      setScore(String(defaults.score));
+    } else if (handicap != null) {
+      setScore(String(Math.round(STANDARD_PAR + handicap)));
+    }
+
+    setCourseRating(
+      String(defaults.course_rating ?? STANDARD_RATING)
+    );
+    setCourseSlope(String(defaults.course_slope ?? STANDARD_SLOPE));
+    defaultsApplied.current = true;
+  }, [handicap, calculatorDefaults]);
 
   const calculate = async (e) => {
     e.preventDefault();
+    const payload = {
+      score: Math.round(Number(score)),
+      course_rating: Number(course_rating),
+      course_slope: Math.round(Number(course_slope)),
+    };
+    if (
+      [payload.score, payload.course_rating, payload.course_slope].some(
+        (value) => Number.isNaN(value)
+      )
+    ) {
+      setProjected("Enter valid numbers");
+      setDifferential(null);
+      return;
+    }
     try {
-      const res = await axios.post(
-        `${API_URL}/handicap/calculate`,
-        {
-          score: +score,
-          course_rating: +course_rating,
-          course_slope: +course_slope,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await axios.post(`${API_URL}/handicap/calculate`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setProjected(
+        res.data.projected_handicap ?? "N/A (need at least 3 qualifying rounds)"
       );
-      setProjected(res.data.projected_handicap);
       setDifferential(res.data.projected_differential);
-    } catch {
-      setProjected("Error");
+    } catch (err) {
+      const message =
+        err.response?.data?.detail?.[0]?.msg ||
+        err.response?.data?.message ||
+        "Could not calculate — is the backend running?";
+      setProjected(message);
       setDifferential(null);
     }
   };
@@ -81,8 +131,20 @@ export default function HandicapCalculator({ token, improvementCutoff }) {
       )}
       {improvementCutoff !== null && improvementCutoff !== undefined && (
         <span className="block text-yellow-700 mt-2">
-          To improve your handicap, your next round must have a differential lower than{" "}
+          To improve or maintain your handicap, your next round must have a differential lower than{" "}
           <b>{Number(improvementCutoff).toFixed(1)}</b>
+        </span>
+      )}
+      {maintainCutoff !== null && maintainCutoff !== undefined && (
+        <span className="block text-amber-700 mt-2">
+          Your next round will drop a round from your handicap calculation. To keep your handicap
+          where it is, shoot{" "}
+          <b>
+            {Math.round(
+              (maintainCutoff * STANDARD_SLOPE) / 113 + STANDARD_RATING
+            )}
+          </b>{" "}
+          or better (~<b>{Number(maintainCutoff).toFixed(1)}</b> differential) on a standard slope {STANDARD_SLOPE} and rating {STANDARD_RATING} course.
         </span>
       )}
     </>

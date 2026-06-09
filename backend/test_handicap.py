@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from handicap import (
     build_score_differentials,
     compute_handicap,
+    compute_maintain_cutoff,
     differentials_to_use_count,
     effective_hole_count,
     expected_9_hole_differential,
@@ -101,6 +102,29 @@ class HandicapTests(unittest.TestCase):
         result = compute_handicap(rounds)
         self.assertIsNotNone(result.improvement_cutoff)
         self.assertEqual(result.improvement_cutoff, result.max_diff_used)
+
+    def test_maintain_cutoff_when_oldest_counted_round_drops(self):
+        rounds = [
+            make_round(i, 80 + i, 72.0, 113, date(2025, 1, i), hole_count=18)
+            for i in range(1, 21)
+        ]
+        result = compute_handicap(rounds)
+        self.assertIsNotNone(result.maintain_cutoff)
+        entries = build_score_differentials(rounds)
+        self.assertEqual(
+            compute_maintain_cutoff(
+                entries, result.handicap_index, result.improvement_cutoff
+            ),
+            result.maintain_cutoff,
+        )
+
+    def test_maintain_cutoff_none_with_fewer_than_20_rounds(self):
+        rounds = [
+            make_round(i, 80 + i, 72.0, 113, date(2025, 1, i), hole_count=18)
+            for i in range(1, 6)
+        ]
+        result = compute_handicap(rounds)
+        self.assertIsNone(result.maintain_cutoff)
 
 
 if __name__ == "__main__":

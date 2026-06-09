@@ -1,6 +1,14 @@
+import datetime
 import math
 from dataclasses import dataclass
 from typing import Optional
+
+
+def round_sort_key(round_obj) -> tuple:
+    """Stable chronological sort key; handles unsaved rounds (id=None)."""
+    rd = round_obj.date or datetime.date.min
+    rid = round_obj.id if round_obj.id is not None else 0
+    return (rd, rid)
 
 # Approximation of the WHS "Player Equation" for expected 9-hole score
 # differentials at a course of standard difficulty. Derived from USGA examples:
@@ -88,11 +96,17 @@ def differentials_to_use_count(total: int) -> int:
     return 8
 
 
+STANDARD_PAR = 72
+STANDARD_COURSE_RATING = 72.0
+STANDARD_COURSE_SLOPE = 113
+
+
 @dataclass
 class HandicapResult:
     handicap_index: Optional[float]
     max_diff_used: Optional[float]
     improvement_cutoff: Optional[float]
+    maintain_cutoff: Optional[float]
     score_differentials: list
     handicap_round_ids: set
     used_differential_count: int
@@ -105,6 +119,42 @@ def _index_from_recent_differentials(recent_diffs: list[float]) -> Optional[floa
     lowest = sorted(recent_diffs)[:count]
     avg = sum(lowest) / count
     return truncate_handicap_index(avg * 0.96)
+
+
+def score_for_differential(
+    differential: float,
+    course_rating: float = STANDARD_COURSE_RATING,
+    course_slope: int = STANDARD_COURSE_SLOPE,
+) -> int:
+    """Convert a score differential to an 18-hole gross score."""
+    return round(differential * course_slope / 113 + course_rating)
+
+
+def compute_maintain_cutoff(
+    entries: list[tuple],
+    current_hi: Optional[float],
+    improvement_cutoff: Optional[float],
+) -> Optional[float]:
+    """
+    Max differential for the next round that keeps handicap from increasing,
+    when the oldest round in the 20-round window counts toward the index.
+    """
+    if len(entries) < 20 or current_hi is None or improvement_cutoff is None:
+        return None
+
+    dropping_diff = entries[-20][1]
+    if dropping_diff > improvement_cutoff:
+        return None
+
+    base_diffs = [d for _, d in entries[-20:]][1:]
+    best = None
+    for tenths in range(0, 600):
+        candidate = tenths / 10.0
+        new_hi = _index_from_recent_differentials(base_diffs + [candidate])
+        if new_hi is not None and new_hi <= current_hi:
+            best = candidate
+
+    return round_to_tenth(best) if best is not None else None
 
 
 def build_score_differentials(rounds_chronological) -> list[tuple]:
@@ -162,28 +212,31 @@ def compute_handicap(
 ) -> HandicapResult:
     """Compute Handicap Index and related metadata from a user's rounds."""
     if not rounds:
-        return HandicapResult(None, None, None, [], set(), 0)
+        return HandicapResult(None, None, None, None, [], set(), 0)
 
     if chronological is None:
-        chronological = sorted(rounds, key=lambda r: (r.date, r.id))
+        chronological = sorted(rounds, key=round_sort_key)
     if entries is None:
         entries = build_score_differentials(chronological)
 
     if not entries:
-        return HandicapResult(None, None, None, [], set(), 0)
+        return HandicapResult(None, None, None, None, entries, set(), 0)
 
     recent_entries = entries[-20:]
     recent_diffs = [d for _, d in recent_entries]
     use_count = differentials_to_use_count(len(recent_diffs))
 
     if use_count == 0:
-        return HandicapResult(None, None, None, entries, set(), 0)
+        return HandicapResult(None, None, None, None, entries, set(), 0)
 
     lowest = sorted(recent_diffs)[:use_count]
     avg = sum(lowest) / use_count
     handicap_index = truncate_handicap_index(avg * 0.96)
     max_diff_used = max(lowest)
     improvement_cutoff = max_diff_used
+    maintain_cutoff = compute_maintain_cutoff(
+        entries, handicap_index, improvement_cutoff
+    )
 
     handicap_round_ids = {rnd.id for rnd, _ in recent_entries}
 
@@ -191,6 +244,7 @@ def compute_handicap(
         handicap_index=handicap_index,
         max_diff_used=max_diff_used,
         improvement_cutoff=improvement_cutoff,
+        maintain_cutoff=maintain_cutoff,
         score_differentials=entries,
         handicap_round_ids=handicap_round_ids,
         used_differential_count=use_count,
@@ -215,7 +269,7 @@ def differential_for_round(round_obj, rounds_before) -> Optional[float]:
         return None
 
     prior_entries = build_score_differentials(
-        sorted(rounds_before, key=lambda r: (r.date, r.id))
+        sorted(rounds_before, key=round_sort_key)
     )
     prior_diffs = [d for _, d in prior_entries][-20:]
     current_hi = _index_from_recent_differentials(prior_diffs) or 10.0
@@ -327,7 +381,7 @@ def compute_dashboard_stats(
         return {}
 
     if chronological is None:
-        chronological = sorted(rounds, key=lambda r: (r.date, r.id))
+        chronological = sorted(rounds, key=round_sort_key)
     if entries is None:
         entries = build_score_differentials(chronological)
     diff_by_id = {rnd.id: diff for rnd, diff in entries}
@@ -351,9 +405,9 @@ def compute_dashboard_stats(
         sum(recent_diffs) / len(recent_diffs) if recent_diffs else None
     )
 
-    sorted_by_date_desc = sorted(rounds, key=lambda r: (r.date, r.id), reverse=True)
+    sorted_by_date_desc = sorted(rounds, key=round_sort_key, reverse=True)
     last_10 = sorted_by_date_desc[:10]
-    last_10_chrono = sorted(last_10, key=lambda r: (r.date, r.id))
+    last_10_chrono = sorted(last_10, key=round_sort_key)
 
     trend_handicaps = []
     for rnd in last_10_chrono:

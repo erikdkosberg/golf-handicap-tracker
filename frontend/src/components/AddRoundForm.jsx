@@ -21,9 +21,16 @@ export default function AddRoundForm({ token, onAdd }) {
       .then((res) => setCourses(res.data));
   }, [token]);
 
-  const courseNames = [
-    ...new Set(courses.map((c) => c.course).filter(Boolean)),
-  ];
+  const courseCounts = courses.reduce((acc, c) => {
+    if (c.course) {
+      acc[c.course] = (acc[c.course] || 0) + (c.round_count || 1);
+    }
+    return acc;
+  }, {});
+
+  const courseNames = [...new Set(courses.map((c) => c.course).filter(Boolean))].sort(
+    (a, b) => (courseCounts[b] || 0) - (courseCounts[a] || 0)
+  );
 
   const teesForCourse =
     course.trim() !== ""
@@ -33,6 +40,7 @@ export default function AddRoundForm({ token, onAdd }) {
               c.course &&
               c.course.toLowerCase() === course.trim().toLowerCase()
           )
+          .sort((a, b) => (b.round_count || 0) - (a.round_count || 0))
           .map((c) => c.tees)
       : [];
   const uniqueTees = [...new Set(teesForCourse.filter(Boolean))];
@@ -176,13 +184,25 @@ export default function AddRoundForm({ token, onAdd }) {
             onChange={(e) => setScore(e.target.value)}
             required
           />
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-full md:w-1/3"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            placeholder="Date"
-          />
+          <div className="relative w-full md:w-1/3">
+            <input
+              className={`border border-gray-300 rounded px-2 py-1 text-base w-full text-center md:text-left ${
+                !date ? "text-transparent" : ""
+              }`}
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              aria-label="Date"
+            />
+            {!date && (
+              <span
+                className="absolute inset-0 flex items-center justify-center text-gray-400 pointer-events-none text-base"
+                aria-hidden="true"
+              >
+                Date
+              </span>
+            )}
+          </div>
           <button
             type="submit"
             className="bg-indigo-600 text-white px-4 py-1 rounded-lg border border-indigo-700 shadow-sm hover:bg-indigo-700 transition font-semibold w-full md:w-1/3"

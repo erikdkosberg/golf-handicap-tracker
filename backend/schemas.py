@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class RegisterRequest(BaseModel):
@@ -40,6 +40,13 @@ class HandicapCalculateRequest(BaseModel):
     score: int
     course_rating: float
     course_slope: int
+
+    @field_validator("score", mode="before")
+    @classmethod
+    def coerce_score(cls, value):
+        if isinstance(value, float):
+            return round(value)
+        return value
 
 
 class GmailSyncRequest(BaseModel):

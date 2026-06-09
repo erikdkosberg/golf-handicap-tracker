@@ -280,8 +280,6 @@ export default function Dashboard({ token, onLogout }) {
     Handicap: d.handicap,
   }));
   const highlightRoundIds = new Set(handicapData?.highlighted_round_ids ?? []);
-  const improvementCutoff = handicapData?.improvement_cutoff;
-
   const handleSort = (field) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -393,7 +391,10 @@ export default function Dashboard({ token, onLogout }) {
           <div className="bg-blue-50 rounded-xl shadow-inner p-4 sm:p-6 flex-1 flex flex-col justify-between min-h-[156px] overflow-x-auto">
             <HandicapCalculator
               token={token}
-              improvementCutoff={improvementCutoff}
+              handicap={handicap}
+              improvementCutoff={handicapData?.improvement_cutoff}
+              maintainCutoff={handicapData?.maintain_cutoff}
+              calculatorDefaults={handicapData?.calculator_defaults}
             />
           </div>
         </div>

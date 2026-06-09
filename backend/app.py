@@ -1,6 +1,7 @@
 import base64
 import datetime
 import os
+from collections import Counter
 
 import jwt
 from dotenv import load_dotenv
@@ -27,6 +28,9 @@ from gmail_helpers import (
 )
 from golfshot_parser import parse_golfshot_email
 from handicap import (
+    STANDARD_COURSE_RATING,
+    STANDARD_COURSE_SLOPE,
+    STANDARD_PAR,
     build_score_differentials,
     calculate_handicap,
     compute_dashboard_stats,
@@ -35,6 +39,7 @@ from handicap import (
     expected_9_hole_differential,
     has_hole_by_hole_data,
     round_score_differential,
+    round_sort_key,
     round_to_tenth,
 )
 from models import Round, SyncProgress, User
@@ -326,7 +331,7 @@ def get_rounds(
         .order_by(Round.date.desc())
         .all()
     )
-    chronological = sorted(rounds, key=lambda r: (r.date, r.id))
+    chronological = sorted(rounds, key=round_sort_key)
     entries = build_score_differentials(chronological)
     diff_by_id = {rnd.id: diff for rnd, diff in entries}
     return [
@@ -350,16 +355,27 @@ def get_handicap(
         .order_by(Round.date.desc())
         .all()
     )
-    chronological = sorted(rounds, key=lambda r: (r.date, r.id))
+    chronological = sorted(rounds, key=round_sort_key)
     entries = build_score_differentials(chronological)
     result = compute_handicap(rounds, chronological=chronological, entries=entries)
     stats = compute_dashboard_stats(
         rounds, chronological=chronological, entries=entries
     )
+    maintain_cutoff = result.maintain_cutoff
     return {
         "handicap": result.handicap_index,
         "max_diff_used": result.max_diff_used,
         "improvement_cutoff": stats.get("improvement_cutoff"),
+        "maintain_cutoff": maintain_cutoff,
+        "calculator_defaults": {
+            "score": (
+                round(result.handicap_index + STANDARD_PAR)
+                if result.handicap_index is not None
+                else None
+            ),
+            "course_rating": STANDARD_COURSE_RATING,
+            "course_slope": STANDARD_COURSE_SLOPE,
+        },
         "stats": {
             "total_rounds": len(rounds),
             "lowest_differential": stats.get("lowest_differential"),
@@ -399,7 +415,7 @@ def calculate_projected_handicap(
         date=datetime.date.today(),
         hole_count=18,
     )
-    all_rounds = sorted(rounds + [fake_round], key=lambda r: (r.date, r.id or 0))
+    all_rounds = sorted(rounds + [fake_round], key=round_sort_key)
     projected_handicap, new_max_diff = calculate_handicap(all_rounds)
     projected_differential = round_to_tenth(
         round_score_differential(data.score, data.course_rating, data.course_slope)
@@ -456,9 +472,12 @@ def get_courses(
     db: Session = Depends(get_db),
 ):
     rounds = db.query(Round).filter_by(user_id=current_user.id).all()
+    combo_counts = Counter(
+        (r.course, r.tees) for r in rounds if r.course and r.tees
+    )
     seen = set()
     courses = []
-    for r in rounds:
+    for r in sorted(rounds, key=lambda x: (x.date, x.id), reverse=True):
         key = (r.course, r.tees)
         if r.course and r.tees and key not in seen:
             seen.add(key)
@@ -470,8 +489,10 @@ def get_courses(
                     "course_slope": r.course_slope,
                     "yardage": r.yardage,
                     "par": r.par,
+                    "round_count": combo_counts[key],
                 }
             )
+    courses.sort(key=lambda c: c["round_count"], reverse=True)
     return courses
 
 
