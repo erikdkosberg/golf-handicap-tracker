@@ -2,6 +2,18 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import API_URL from "../api";
 
+const inputClass =
+  "border border-gray-300 rounded px-3 py-1.5 text-sm w-full";
+
+function Field({ label, children }) {
+  return (
+    <div className="flex flex-col w-full min-w-0">
+      <label className="text-xs text-gray-600 mb-1">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 export default function AddRoundForm({ token, onAdd }) {
   const [score, setScore] = useState("");
   const [course_rating, setCourseRating] = useState("");
@@ -93,125 +105,117 @@ export default function AddRoundForm({ token, onAdd }) {
   };
 
   return (
-    <>
-      <span className="font-semibold text-indigo-700 mb-2 block text-lg">
+    <div className="flex flex-col h-full">
+      <span className="font-semibold text-indigo-700 mb-2 block text-sm shrink-0">
         Add Round
       </span>
       <form
-        className="flex flex-col gap-2 w-full"
+        className="flex flex-col gap-2.5 w-full flex-1"
         onSubmit={submit}
         autoComplete="off"
       >
-        {/* Row 1: Course + Tees */}
-        <div className="flex flex-col md:flex-row gap-2 w-full">
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-full md:w-1/2"
-            type="text"
-            placeholder="Course"
-            value={course}
-            onChange={(e) => {
-              setCourse(e.target.value);
-              setTees("");
-            }}
-            list="course-list"
-            autoComplete="off"
-            required
-          />
-          <datalist id="course-list">
-            {courseNames.map((c, i) => (
-              <option key={i} value={c} />
-            ))}
-          </datalist>
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-full md:w-1/2"
-            type="text"
-            placeholder="Tees"
-            value={tees}
-            onChange={(e) => setTees(e.target.value)}
-            list="tees-list"
-            autoComplete="off"
-            required
-          />
-          <datalist id="tees-list">
-            {uniqueTees.map((t, i) => (
-              <option key={i} value={t} />
-            ))}
-          </datalist>
-        </div>
-
-        {/* Row 2: Rating, Slope, Yardage, Par */}
-        <div className="flex flex-col md:flex-row gap-2 w-full">
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-full md:w-1/4"
-            type="number"
-            step="0.1"
-            placeholder="Rating"
-            value={course_rating}
-            onChange={(e) => setCourseRating(e.target.value)}
-            required
-          />
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-full md:w-1/4"
-            type="number"
-            placeholder="Slope"
-            value={course_slope}
-            onChange={(e) => setCourseSlope(e.target.value)}
-            required
-          />
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-full md:w-1/4"
-            type="number"
-            placeholder="Yardage"
-            value={yardage}
-            onChange={(e) => setYardage(e.target.value)}
-          />
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-full md:w-1/4"
-            type="number"
-            placeholder="Par"
-            value={par}
-            onChange={(e) => setPar(e.target.value)}
-          />
-        </div>
-
-        {/* Row 3: Score + Date + Add Button */}
-        <div className="flex flex-col md:flex-row gap-2 w-full">
-          <input
-            className="border border-gray-300 rounded px-2 py-1 text-base w-full md:w-1/3"
-            type="number"
-            placeholder="Score"
-            value={score}
-            onChange={(e) => setScore(e.target.value)}
-            required
-          />
-          <div className="relative w-full md:w-1/3">
+        <div className="flex flex-col md:flex-row gap-2.5 w-full">
+          <Field label="Course">
             <input
-              className={`border border-gray-300 rounded px-2 py-1 text-base w-full text-center md:text-left ${
-                !date ? "text-transparent" : ""
-              }`}
+              className={inputClass}
+              type="text"
+              value={course}
+              onChange={(e) => {
+                setCourse(e.target.value);
+                setTees("");
+              }}
+              list="course-list"
+              autoComplete="off"
+              required
+            />
+            <datalist id="course-list">
+              {courseNames.map((c, i) => (
+                <option key={i} value={c} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label="Tees">
+            <input
+              className={inputClass}
+              type="text"
+              value={tees}
+              onChange={(e) => setTees(e.target.value)}
+              list="tees-list"
+              autoComplete="off"
+              required
+            />
+            <datalist id="tees-list">
+              {uniqueTees.map((t, i) => (
+                <option key={i} value={t} />
+              ))}
+            </datalist>
+          </Field>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-2.5 w-full">
+          <Field label="Rating">
+            <input
+              className={inputClass}
+              type="number"
+              step="0.1"
+              value={course_rating}
+              onChange={(e) => setCourseRating(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Slope">
+            <input
+              className={inputClass}
+              type="number"
+              value={course_slope}
+              onChange={(e) => setCourseSlope(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Yardage">
+            <input
+              className={inputClass}
+              type="number"
+              value={yardage}
+              onChange={(e) => setYardage(e.target.value)}
+            />
+          </Field>
+          <Field label="Par">
+            <input
+              className={inputClass}
+              type="number"
+              value={par}
+              onChange={(e) => setPar(e.target.value)}
+            />
+          </Field>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-2.5 w-full items-end">
+          <Field label="Score">
+            <input
+              className={inputClass}
+              type="number"
+              value={score}
+              onChange={(e) => setScore(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Date">
+            <input
+              className={inputClass}
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              aria-label="Date"
             />
-            {!date && (
-              <span
-                className="absolute inset-0 flex items-center justify-center text-gray-400 pointer-events-none text-base"
-                aria-hidden="true"
-              >
-                Date
-              </span>
-            )}
-          </div>
+          </Field>
           <button
             type="submit"
-            className="bg-indigo-600 text-white px-4 py-1 rounded-lg border border-indigo-700 shadow-sm hover:bg-indigo-700 transition font-semibold w-full md:w-1/3"
-            style={{ minWidth: "70px" }}
+            className="bg-indigo-600 text-white px-4 py-1.5 text-sm rounded-lg border border-indigo-700 shadow-sm hover:bg-indigo-700 transition font-semibold w-full md:w-auto md:min-w-[5.5rem] shrink-0"
           >
             Add
           </button>
         </div>
       </form>
-    </>
+    </div>
   );
 }

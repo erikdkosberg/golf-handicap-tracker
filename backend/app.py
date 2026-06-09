@@ -31,6 +31,7 @@ from handicap import (
     STANDARD_COURSE_RATING,
     STANDARD_COURSE_SLOPE,
     STANDARD_PAR,
+    build_handicap_breakdown,
     build_score_differentials,
     calculate_handicap,
     compute_dashboard_stats,
@@ -390,6 +391,28 @@ def get_handicap(
         "highlighted_round_ids": stats.get("highlighted_round_ids", []),
         "chart_data": stats.get("chart_data", []),
     }
+
+
+@app.get("/handicap/breakdown")
+def get_handicap_breakdown(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    rounds = (
+        db.query(Round)
+        .filter(
+            Round.user_id == current_user.id,
+            Round.course_rating.isnot(None),
+            Round.course_slope.isnot(None),
+        )
+        .order_by(Round.date.desc())
+        .all()
+    )
+    chronological = sorted(rounds, key=round_sort_key)
+    entries = build_score_differentials(chronological)
+    return build_handicap_breakdown(
+        rounds, chronological=chronological, entries=entries
+    )
 
 
 @app.post("/handicap/calculate")

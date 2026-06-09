@@ -458,3 +458,282 @@ def compute_dashboard_stats(
         "lowest_round_to_par": lowest_18_hole_round_to_par(rounds),
         "differentials_by_id": diff_by_id,
     }
+
+
+WHS_RULES = [
+    {
+        "rule": "5.1",
+        "title": "Score Differential",
+        "summary": (
+            "For each acceptable score, calculate "
+            "(Adjusted Gross Score − Course Rating) × 113 ÷ Slope Rating, "
+            "then round to the nearest tenth (0.5 rounds up)."
+        ),
+        "url": "https://www.usga.org/content/usga/home-page/rules-hub/rules-of-handicapping/rule-5.html",
+    },
+    {
+        "rule": "5.2",
+        "title": "Calculation of Handicap Index",
+        "summary": (
+            "Average the lowest score differentials in the most recent 20, "
+            "multiply by 0.96 (the 'bonus for excellence'), then truncate "
+            "to one decimal place."
+        ),
+        "url": "https://www.usga.org/content/usga/home-page/rules-hub/rules-of-handicapping/rule-5.html",
+    },
+    {
+        "rule": "5.2a",
+        "title": "Number of Score Differentials in Calculation",
+        "summary": (
+            "The number of lowest differentials used depends on how many "
+            "are in the most recent 20 (e.g. 8 when 20 are available, "
+            "fewer when fewer rounds have been posted)."
+        ),
+        "url": "https://www.usga.org/content/usga/home-page/rules-hub/rules-of-handicapping/rule-5.html",
+    },
+    {
+        "rule": "5.2b",
+        "title": "9-Hole Scores",
+        "summary": (
+            "Once a player has posted at least 54 holes, a 9-hole score "
+            "differential is combined with an expected 9-hole differential "
+            "based on the player's Handicap Index at the time."
+        ),
+        "url": "https://www.usga.org/content/usga/home-page/rules-hub/rules-of-handicapping/rule-5.html",
+    },
+    {
+        "rule": "2.1",
+        "title": "Acceptable Scores",
+        "summary": (
+            "Only scores with a valid Course Rating and Slope Rating are "
+            "included in the scoring record used for the Handicap Index."
+        ),
+        "url": "https://www.usga.org/content/usga/home-page/rules-hub/rules-of-handicapping/rule-2.html",
+    },
+]
+
+def _differentials_table_label(count: int) -> Optional[str]:
+    """Label for the WHS 5.2a lookup table row matching `count` differentials."""
+    if count < 3:
+        return None
+    if count == 3:
+        return "3"
+    if count <= 5:
+        return "4–5"
+    if count <= 8:
+        return "6–8"
+    if count <= 11:
+        return "9–11"
+    if count <= 14:
+        return "12–14"
+    if count <= 16:
+        return "15–16"
+    if count <= 18:
+        return "17–18"
+    if count == 19:
+        return "19"
+    return "20"
+
+
+DIFFERENTIALS_TO_USE_TABLE = [
+    {"score_differentials_available": "3", "count_to_use": 1},
+    {"score_differentials_available": "4–5", "count_to_use": 1},
+    {"score_differentials_available": "6–8", "count_to_use": 2},
+    {"score_differentials_available": "9–11", "count_to_use": 3},
+    {"score_differentials_available": "12–14", "count_to_use": 4},
+    {"score_differentials_available": "15–16", "count_to_use": 5},
+    {"score_differentials_available": "17–18", "count_to_use": 6},
+    {"score_differentials_available": "19", "count_to_use": 7},
+    {"score_differentials_available": "20", "count_to_use": 8},
+]
+
+
+def _differential_detail_for_round(rnd, chronological_before) -> dict:
+    """Build per-round differential math for the breakdown view."""
+    hole_count = effective_hole_count(rnd)
+    raw = round_score_differential(rnd.score, rnd.course_rating, rnd.course_slope)
+
+    detail = {
+        "hole_count": hole_count,
+        "formula": "(Score − Course Rating) × 113 ÷ Slope Rating",
+        "score": rnd.score,
+        "course_rating": rnd.course_rating,
+        "course_slope": rnd.course_slope,
+        "raw_differential": round(raw, 4),
+        "rounded_differential": round_to_tenth(raw),
+        "is_nine_hole_combined": False,
+    }
+
+    if hole_count != 9:
+        return detail
+
+    holes_before = sum(effective_hole_count(r) for r in chronological_before)
+    if holes_before + hole_count < 54:
+        detail["excluded_reason"] = (
+            "9-hole score not yet in scoring record "
+            "(fewer than 54 holes posted)"
+        )
+        return detail
+
+    prior_entries = build_score_differentials(
+        sorted(chronological_before, key=round_sort_key)
+    )
+    prior_diffs = [d for _, d in prior_entries][-20:]
+    current_hi = _index_from_recent_differentials(prior_diffs) or 10.0
+    nine_diff = raw
+    expected = expected_9_hole_differential(current_hi)
+    combined = round_to_tenth(nine_diff + expected)
+
+    detail.update(
+        {
+            "is_nine_hole_combined": True,
+            "nine_hole_differential": round_to_tenth(nine_diff),
+            "handicap_index_at_time": current_hi,
+            "expected_nine_hole_differential": round(expected, 2),
+            "combined_differential": combined,
+            "nine_hole_formula": (
+                "9-hole Score Differential + Expected 9-hole Score Differential"
+            ),
+            "rounded_differential": combined,
+        }
+    )
+    return detail
+
+
+def build_handicap_breakdown(
+    rounds,
+    *,
+    chronological=None,
+    entries=None,
+) -> dict:
+    """Detailed WHS handicap calculation breakdown for the UI."""
+    if chronological is None:
+        chronological = sorted(rounds, key=round_sort_key)
+
+    valid_rounds = [
+        r
+        for r in chronological
+        if r.course_rating is not None and r.course_slope is not None
+    ]
+    total_holes = sum(effective_hole_count(r) for r in valid_rounds)
+
+    if entries is None:
+        entries = build_score_differentials(chronological)
+
+    result = compute_handicap(
+        rounds, chronological=chronological, entries=entries
+    )
+    recent_entries = entries[-20:]
+    recent_diffs = [d for _, d in recent_entries]
+    use_count = differentials_to_use_count(len(recent_diffs))
+
+    lowest_with_entries = (
+        sorted(recent_entries, key=lambda item: item[1])[:use_count]
+        if use_count
+        else []
+    )
+    lowest_diffs = [d for _, d in lowest_with_entries]
+    used_round_ids = {rnd.id for rnd, _ in lowest_with_entries}
+
+    avg = sum(lowest_diffs) / use_count if use_count else None
+    after_bonus = avg * 0.96 if avg is not None else None
+
+    chrono_index = {rnd.id: i for i, rnd in enumerate(chronological)}
+
+    window_rounds = []
+    for rnd, diff in reversed(recent_entries):
+        before = chronological[: chrono_index[rnd.id]]
+        diff_detail = _differential_detail_for_round(rnd, before)
+        window_rounds.append(
+            {
+                "id": rnd.id,
+                "date": rnd.date.strftime("%Y-%m-%d") if rnd.date else None,
+                "score": rnd.score,
+                "course": rnd.course,
+                "tees": rnd.tees,
+                "par": rnd.par,
+                "hole_count": effective_hole_count(rnd),
+                "course_rating": rnd.course_rating,
+                "course_slope": rnd.course_slope,
+                "differential": diff,
+                "differential_detail": diff_detail,
+                "used_in_calculation": rnd.id in used_round_ids,
+            }
+        )
+
+    excluded_nine_hole = []
+    for rnd in valid_rounds:
+        if effective_hole_count(rnd) != 9:
+            continue
+        if any(r.id == rnd.id for r, _ in entries):
+            continue
+        excluded_nine_hole.append(
+            {
+                "id": rnd.id,
+                "date": rnd.date.strftime("%Y-%m-%d") if rnd.date else None,
+                "score": rnd.score,
+                "course": rnd.course,
+                "reason": "9-hole score excluded until 54 holes are posted",
+            }
+        )
+
+    calculation = None
+    if use_count and avg is not None:
+        calculation = {
+            "lowest_differentials": lowest_diffs,
+            "count_used": use_count,
+            "sum": round(sum(lowest_diffs), 2),
+            "average": round(avg, 4),
+            "bonus_factor": 0.96,
+            "after_bonus_factor": round(after_bonus, 4),
+            "truncated_handicap_index": result.handicap_index,
+            "steps": [
+                {
+                    "step": 1,
+                    "description": "Identify the most recent 20 score differentials",
+                    "value": len(recent_diffs),
+                },
+                {
+                    "step": 2,
+                    "description": (
+                        f"Select the lowest {use_count} differentials "
+                        f"(WHS Rule 5.2a)"
+                    ),
+                    "value": lowest_diffs,
+                },
+                {
+                    "step": 3,
+                    "description": "Average the selected differentials",
+                    "formula": f"({' + '.join(str(d) for d in lowest_diffs)}) ÷ {use_count}",
+                    "value": round(avg, 4),
+                },
+                {
+                    "step": 4,
+                    "description": "Apply the bonus for excellence (× 0.96)",
+                    "formula": f"{round(avg, 4)} × 0.96",
+                    "value": round(after_bonus, 4),
+                },
+                {
+                    "step": 5,
+                    "description": "Truncate to one decimal place (WHS Rule 5.2)",
+                    "value": result.handicap_index,
+                },
+            ],
+        }
+
+    return {
+        "handicap_index": result.handicap_index,
+        "insufficient_rounds": use_count == 0,
+        "minimum_rounds_required": 3,
+        "total_score_differentials": len(entries),
+        "total_holes_posted": total_holes,
+        "window_size": 20,
+        "rounds_in_window": len(recent_entries),
+        "differentials_to_use": use_count,
+        "active_differentials_row": _differentials_table_label(len(recent_diffs)),
+        "differentials_to_use_table": DIFFERENTIALS_TO_USE_TABLE,
+        "calculation": calculation,
+        "window_rounds": window_rounds,
+        "excluded_nine_hole_rounds": excluded_nine_hole,
+        "rules": WHS_RULES,
+    }

@@ -5,6 +5,7 @@ import axios from "axios";
 import RoundRow from "./RoundRow";
 import AddRoundForm from "./AddRoundForm";
 import HandicapCalculator from "./HandicapCalculator";
+import HandicapBreakdown from "./HandicapBreakdown";
 import { ScoreHandicapChart } from "./ScoreHandicapChart";
 import { StatCard, TrendCard } from "./StatCards";
 import { formatDate } from "../utilities/utility";
@@ -207,6 +208,7 @@ function SyncGolfshotButton({ token, onSync, disabled, defaultPlayerName }) {
 const ROUNDS_PER_PAGE = 40;
 
 export default function Dashboard({ token, onLogout }) {
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const [rounds, setRounds] = useState([]);
   const [handicapData, setHandicapData] = useState(null);
   const [handicapLoading, setHandicapLoading] = useState(true);
@@ -338,6 +340,18 @@ export default function Dashboard({ token, onLogout }) {
     return `${roundInfo.score} (${diff > 0 ? "+" : ""}${diff})`;
   };
 
+  const openHandicapBreakdown = () => setShowBreakdown(true);
+
+  if (showBreakdown) {
+    return (
+      <HandicapBreakdown
+        token={token}
+        onLogout={onLogout}
+        onBack={() => setShowBreakdown(false)}
+      />
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-2 sm:px-6 py-4 sm:py-8">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 sm:gap-0">
@@ -352,11 +366,18 @@ export default function Dashboard({ token, onLogout }) {
         </button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 mb-8 h-auto md:h-[400px]">
-        <div className="flex flex-col gap-6 min-w-[220px] md:w-[260px] h-full">
-          <div className="bg-indigo-50 rounded-xl shadow-inner p-4 sm:p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px]">
-            <span className="text-base text-gray-600 mb-2">Current Handicap</span>
-            <span className="text-3xl font-bold min-h-[36px] flex items-center justify-center">
+      <div className="flex flex-col md:flex-row gap-4 mb-8 h-auto md:h-[460px] min-h-0">
+        <div className="flex flex-col gap-4 min-w-[220px] md:w-[260px] h-full min-h-0">
+          <button
+            type="button"
+            onClick={openHandicapBreakdown}
+            className="bg-indigo-50 rounded-xl shadow-inner p-4 sm:p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px] w-full hover:bg-indigo-100 hover:shadow-md transition cursor-pointer group"
+            title="View handicap calculation breakdown"
+          >
+            <span className="text-base text-gray-600 mb-2 group-hover:text-indigo-700">
+              Current Handicap
+            </span>
+            <span className="text-3xl font-bold min-h-[36px] flex items-center justify-center text-indigo-900">
               {statsLoading ? (
                 <LoadingSpinner size="lg" />
               ) : handicap !== null ? (
@@ -365,7 +386,10 @@ export default function Dashboard({ token, onLogout }) {
                 "N/A"
               )}
             </span>
-          </div>
+            <span className="text-xs text-indigo-500 mt-2">
+              View calculation →
+            </span>
+          </button>
           <div className="bg-green-50 rounded-xl shadow-inner p-4 sm:p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px]">
             <span className="text-base text-gray-600 mb-1">Lowest Round to Par</span>
             <span className="text-3xl font-bold mb-1 min-h-[36px] flex items-center justify-center">
@@ -386,14 +410,14 @@ export default function Dashboard({ token, onLogout }) {
             )}
           </div>
         </div>
-        <div className="flex flex-col gap-6 flex-1 h-full">
-          <div className="bg-blue-50 rounded-xl shadow-inner p-4 sm:p-6 flex-1 flex flex-col justify-between min-h-[156px] overflow-x-auto">
+        <div className="flex flex-col gap-4 flex-1 h-full min-h-0">
+          <div className="bg-blue-50 rounded-xl shadow-inner p-4 flex-[3] flex flex-col min-h-0">
             <AddRoundForm
               token={token}
               onAdd={fetchData}
             />
           </div>
-          <div className="bg-blue-50 rounded-xl shadow-inner p-4 sm:p-6 flex-1 flex flex-col justify-between min-h-[156px] overflow-x-auto">
+          <div className="bg-blue-50 rounded-xl shadow-inner p-4 flex-[2] flex flex-col min-h-0">
             <HandicapCalculator
               token={token}
               handicap={handicap}

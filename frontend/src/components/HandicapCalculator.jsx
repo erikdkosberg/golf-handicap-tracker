@@ -80,73 +80,85 @@ export default function HandicapCalculator({
   };
 
   return (
-    <>
-      <span className="font-semibold text-indigo-700 mb-1">
+    <div className="flex flex-col h-full min-h-0">
+      <span className="font-semibold text-indigo-700 mb-1 block text-sm shrink-0">
         What-If Handicap Calculator
       </span>
       <form
-        className="flex flex-wrap gap-2 w-full items-end"
+        className="flex flex-wrap gap-1.5 w-full items-start shrink-0"
         onSubmit={calculate}
       >
-        <input
-          className="border border-gray-300 rounded px-2 py-1 text-base w-full sm:w-24 flex-shrink"
-          type="number"
-          placeholder="Score"
-          value={score}
-          onChange={(e) => setScore(e.target.value)}
-          required
-        />
-        <input
-          className="border border-gray-300 rounded px-2 py-1 text-base w-full sm:w-24 flex-shrink"
-          type="number"
-          step="0.1"
-          placeholder="Rating"
-          value={course_rating}
-          onChange={(e) => setCourseRating(e.target.value)}
-          required
-        />
-        <input
-          className="border border-gray-300 rounded px-2 py-1 text-base w-full sm:w-24 flex-shrink"
-          type="number"
-          placeholder="Slope"
-          value={course_slope}
-          onChange={(e) => setCourseSlope(e.target.value)}
-          required
-        />
+        <div className="flex flex-col items-center w-full sm:w-20">
+          <input
+            className="border border-gray-300 rounded px-2 py-0.5 text-sm h-8 w-full"
+            type="number"
+            value={score}
+            onChange={(e) => setScore(e.target.value)}
+            required
+          />
+          <span className="text-[11px] text-gray-600 mt-0.5">Score</span>
+        </div>
+        <div className="flex flex-col items-center w-full sm:w-20">
+          <input
+            className="border border-gray-300 rounded px-2 py-0.5 text-sm h-8 w-full"
+            type="number"
+            step="0.1"
+            value={course_rating}
+            onChange={(e) => setCourseRating(e.target.value)}
+            required
+          />
+          <span className="text-[11px] text-gray-600 mt-0.5">Rating</span>
+        </div>
+        <div className="flex flex-col items-center w-full sm:w-20">
+          <input
+            className="border border-gray-300 rounded px-2 py-0.5 text-sm h-8 w-full"
+            type="number"
+            value={course_slope}
+            onChange={(e) => setCourseSlope(e.target.value)}
+            required
+          />
+          <span className="text-[11px] text-gray-600 mt-0.5">Slope</span>
+        </div>
         <button
           type="submit"
-          className="bg-emerald-600 text-white px-4 py-1 rounded-lg border border-emerald-700 shadow-sm hover:bg-emerald-700 transition font-semibold w-full sm:w-auto"
+          className="bg-emerald-600 text-white px-3 h-8 text-sm rounded-lg border border-emerald-700 shadow-sm hover:bg-emerald-700 transition font-semibold w-full sm:w-auto"
           style={{ minWidth: "70px" }}
         >
           Project
         </button>
       </form>
-      {projected !== null && (
-        <span className="block text-emerald-700 mt-2">
-          Projected Handicap: {projected}
-          {differential !== null && (
-            <> &nbsp;&middot;&nbsp; Differential: {Number(differential).toFixed(1)}</>
-          )}
-        </span>
-      )}
-      {improvementCutoff !== null && improvementCutoff !== undefined && (
-        <span className="block text-yellow-700 mt-2">
-          To improve or maintain your handicap, your next round must have a differential lower than{" "}
-          <b>{Number(improvementCutoff).toFixed(1)}</b>
-        </span>
-      )}
-      {maintainCutoff !== null && maintainCutoff !== undefined && (
-        <span className="block text-amber-700 mt-2">
-          Your next round will drop a round from your handicap calculation. To keep your handicap
-          where it is, shoot{" "}
-          <b>
-            {Math.round(
-              (maintainCutoff * STANDARD_SLOPE) / 113 + STANDARD_RATING
+      <div className="mt-1 space-y-0.5 min-h-0">
+        {projected !== null && (
+          <p className="text-xs leading-snug text-emerald-700">
+            Projected Handicap: {projected}
+            {differential !== null && (
+              <> &middot; Differential: {Number(differential).toFixed(1)}</>
             )}
-          </b>{" "}
-          or better (~<b>{Number(maintainCutoff).toFixed(1)}</b> differential) on a standard slope {STANDARD_SLOPE} and rating {STANDARD_RATING} course.
-        </span>
-      )}
-    </>
+          </p>
+        )}
+        {maintainCutoff == null &&
+          improvementCutoff !== null &&
+          improvementCutoff !== undefined && (
+          <p className="text-xs leading-snug text-yellow-700">
+            To improve or maintain your handicap, your next round must have a
+            differential lower than <b>{Number(improvementCutoff).toFixed(1)}</b>
+          </p>
+        )}
+        {maintainCutoff !== null && maintainCutoff !== undefined && (
+          <p className="text-xs leading-snug text-amber-700">
+            Your next round will drop a round from your handicap calculation. To
+            keep your handicap where it is, shoot{" "}
+            <b>
+              {Math.round(
+                (maintainCutoff * STANDARD_SLOPE) / 113 + STANDARD_RATING
+              )}
+            </b>{" "}
+            or better (~<b>{Number(maintainCutoff).toFixed(1)}</b> differential)
+            on a standard rating {STANDARD_RATING} and slope {STANDARD_SLOPE}{" "}
+            course.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
