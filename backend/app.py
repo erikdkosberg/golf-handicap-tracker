@@ -350,8 +350,12 @@ def get_handicap(
         .order_by(Round.date.desc())
         .all()
     )
-    result = compute_handicap(rounds)
-    stats = compute_dashboard_stats(rounds)
+    chronological = sorted(rounds, key=lambda r: (r.date, r.id))
+    entries = build_score_differentials(chronological)
+    result = compute_handicap(rounds, chronological=chronological, entries=entries)
+    stats = compute_dashboard_stats(
+        rounds, chronological=chronological, entries=entries
+    )
     return {
         "handicap": result.handicap_index,
         "max_diff_used": result.max_diff_used,

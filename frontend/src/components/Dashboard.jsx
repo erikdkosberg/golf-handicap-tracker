@@ -1,6 +1,6 @@
 // src/components/Dashboard.jsx
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import RoundRow from "./RoundRow";
 import AddRoundForm from "./AddRoundForm";
@@ -10,6 +10,7 @@ import { StatCard, TrendCard } from "./StatCards";
 import { formatDate } from "../utilities/utility";
 import API_URL from "../api";
 import SyncProgressBar from "./SyncProgressBar";
+import LoadingSpinner from "./LoadingSpinner";
 
 // --------- Modal Component -----------
 function Modal({ open, title, children, onClose }) {
@@ -206,33 +207,56 @@ function SyncGolfshotButton({ token, onSync, disabled, defaultPlayerName }) {
 export default function Dashboard({ token, onLogout }) {
   const [rounds, setRounds] = useState([]);
   const [handicapData, setHandicapData] = useState(null);
+  const [handicapLoading, setHandicapLoading] = useState(true);
   const [username, setUsername] = useState("Golfer");
   const [sortField, setSortField] = useState("date");
   const [sortDirection, setSortDirection] = useState("desc");
   const [gmailLinked, setGmailLinked] = useState(false);
+  const initialHandicapLoad = useRef(true);
+
+  const handleAuthError = useCallback(
+    (err) => {
+      if (err.response?.status === 401) {
+        onLogout();
+      }
+    },
+    [onLogout]
+  );
 
   const fetchData = useCallback(async () => {
     if (!token) {
       onLogout();
       return;
     }
-    try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const [roundsRes, handicapRes, meRes] = await Promise.all([
-        axios.get(`${API_URL}/rounds`, { headers }),
-        axios.get(`${API_URL}/handicap`, { headers }),
-        axios.get(`${API_URL}/me`, { headers }),
-      ]);
-      setRounds(roundsRes.data);
-      setHandicapData(handicapRes.data);
-      setUsername(meRes.data.username || meRes.data.email || "Golfer");
-      setGmailLinked(meRes.data.gmail_linked || false);
-    } catch (err) {
-      if (err.response?.status === 401) {
-        onLogout();
-      }
+
+    const headers = { Authorization: `Bearer ${token}` };
+    const showHandicapSpinner = initialHandicapLoad.current;
+    if (showHandicapSpinner) {
+      setHandicapLoading(true);
     }
-  }, [token, onLogout]);
+
+    axios
+      .get(`${API_URL}/me`, { headers })
+      .then((res) => {
+        setUsername(res.data.username || res.data.email || "Golfer");
+        setGmailLinked(res.data.gmail_linked || false);
+      })
+      .catch(handleAuthError);
+
+    axios
+      .get(`${API_URL}/rounds`, { headers })
+      .then((res) => setRounds(res.data))
+      .catch(handleAuthError);
+
+    axios
+      .get(`${API_URL}/handicap`, { headers })
+      .then((res) => setHandicapData(res.data))
+      .catch(handleAuthError)
+      .finally(() => {
+        setHandicapLoading(false);
+        initialHandicapLoad.current = false;
+      });
+  }, [token, onLogout, handleAuthError]);
 
   useEffect(() => {
     fetchData();
@@ -247,6 +271,7 @@ export default function Dashboard({ token, onLogout }) {
 
   const handicap = handicapData?.handicap ?? null;
   const stats = handicapData?.stats ?? {};
+  const statsLoading = handicapLoading && handicapData === null;
   const lowestRoundToPar = handicapData?.lowest_round_to_par;
   const chartData = (handicapData?.chart_data ?? []).map((d) => ({
     date: d.date,
@@ -328,14 +353,20 @@ export default function Dashboard({ token, onLogout }) {
         <div className="flex flex-col gap-6 min-w-[220px] md:w-[260px] h-full">
           <div className="bg-indigo-50 rounded-xl shadow-inner p-4 sm:p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px]">
             <span className="text-base text-gray-600 mb-2">Current Handicap</span>
-            <span className="text-3xl font-bold">
-              {handicap !== null ? handicap : "N/A"}
+            <span className="text-3xl font-bold min-h-[36px] flex items-center justify-center">
+              {statsLoading ? (
+                <LoadingSpinner size="lg" />
+              ) : handicap !== null ? (
+                handicap
+              ) : (
+                "N/A"
+              )}
             </span>
           </div>
           <div className="bg-green-50 rounded-xl shadow-inner p-4 sm:p-6 flex flex-col items-center justify-center h-1/2 min-h-[120px]">
             <span className="text-base text-gray-600 mb-1">Lowest Round to Par</span>
-            <span className="text-3xl font-bold mb-1">
-              {formatToPar(lowestRoundToPar)}
+            <span className="text-3xl font-bold mb-1 min-h-[36px] flex items-center justify-center">
+              {statsLoading ? <LoadingSpinner size="lg" /> : formatToPar(lowestRoundToPar)}
             </span>
             {lowestRoundToPar && (
               <div className="text-xs text-gray-600 text-center mt-1">
@@ -369,27 +400,40 @@ export default function Dashboard({ token, onLogout }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 my-8">
-        <StatCard label="Total Rounds" value={stats.total_rounds ?? rounds.length} colorClass="bg-orange-50" />
+        <StatCard
+          label="Total Rounds"
+          value={statsLoading ? <LoadingSpinner /> : (stats.total_rounds ?? rounds.length)}
+          colorClass="bg-orange-50"
+        />
         <StatCard
           label="Lowest Differential"
           value={
-            stats.lowest_differential != null
-              ? stats.lowest_differential.toFixed(1)
-              : "N/A"
+            statsLoading ? (
+              <LoadingSpinner />
+            ) : stats.lowest_differential != null ? (
+              stats.lowest_differential.toFixed(1)
+            ) : (
+              "N/A"
+            )
           }
           colorClass="bg-blue-50"
         />
         <StatCard
           label="Average Differential (20)"
           value={
-            stats.average_differential_20 != null
-              ? stats.average_differential_20.toFixed(1)
-              : "N/A"
+            statsLoading ? (
+              <LoadingSpinner />
+            ) : stats.average_differential_20 != null ? (
+              stats.average_differential_20.toFixed(1)
+            ) : (
+              "N/A"
+            )
           }
           colorClass="bg-yellow-50"
         />
         <TrendCard
           label="Handicap Trend (10)"
+          loading={statsLoading}
           value={
             stats.handicap_trend_10 != null
               ? Math.abs(stats.handicap_trend_10).toFixed(2)
@@ -400,27 +444,27 @@ export default function Dashboard({ token, onLogout }) {
 
         <StatCard
           label="Avg Birdies/Round"
-          value={stats.avg_birdies ?? "N/A"}
+          value={statsLoading ? <LoadingSpinner /> : (stats.avg_birdies ?? "N/A")}
           colorClass="bg-green-50"
         />
         <StatCard
           label="Avg Pars/Round"
-          value={stats.avg_pars ?? "N/A"}
+          value={statsLoading ? <LoadingSpinner /> : (stats.avg_pars ?? "N/A")}
           colorClass="bg-indigo-50"
         />
         <StatCard
           label="Avg Bogeys/Round"
-          value={stats.avg_bogeys ?? "N/A"}
+          value={statsLoading ? <LoadingSpinner /> : (stats.avg_bogeys ?? "N/A")}
           colorClass="bg-yellow-100"
         />
         <StatCard
           label="Avg Dbl+ Bogey/Round"
-          value={stats.avg_double_or_worse ?? "N/A"}
+          value={statsLoading ? <LoadingSpinner /> : (stats.avg_double_or_worse ?? "N/A")}
           colorClass="bg-rose-50"
         />
       </div>
 
-      <ScoreHandicapChart chartData={chartData} />
+      <ScoreHandicapChart chartData={chartData} loading={statsLoading} />
 
       <div className="mb-12">
         <div className="text-lg font-semibold mb-2">Past Rounds</div>

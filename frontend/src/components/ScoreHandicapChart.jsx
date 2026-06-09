@@ -10,13 +10,19 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import LoadingSpinner from "./LoadingSpinner";
 
-export function ScoreHandicapChart({ chartData }) {
+export function ScoreHandicapChart({ chartData, loading = false }) {
   return (
     <div className="bg-white rounded-xl shadow-inner p-4 sm:p-6 mb-8">
       <span className="text-base font-semibold text-indigo-800 mb-2 block">
         Score, Differential & Handicap (Last 20 Eighteen-Hole Rounds)
       </span>
+      {loading ? (
+        <div className="flex items-center justify-center h-[260px]">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : (
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={chartData}>
           <XAxis dataKey="date" tick={{ fontSize: 11 }} />
@@ -71,6 +77,7 @@ export function ScoreHandicapChart({ chartData }) {
           />
         </LineChart>
       </ResponsiveContainer>
+      )}
     </div>
   );
 }

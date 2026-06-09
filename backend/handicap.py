@@ -154,13 +154,20 @@ def calculate_handicap(rounds) -> tuple[Optional[float], Optional[float]]:
     return result.handicap_index, result.max_diff_used
 
 
-def compute_handicap(rounds) -> HandicapResult:
+def compute_handicap(
+    rounds,
+    *,
+    chronological=None,
+    entries=None,
+) -> HandicapResult:
     """Compute Handicap Index and related metadata from a user's rounds."""
     if not rounds:
         return HandicapResult(None, None, None, [], set(), 0)
 
-    chronological = sorted(rounds, key=lambda r: (r.date, r.id))
-    entries = build_score_differentials(chronological)
+    if chronological is None:
+        chronological = sorted(rounds, key=lambda r: (r.date, r.id))
+    if entries is None:
+        entries = build_score_differentials(chronological)
 
     if not entries:
         return HandicapResult(None, None, None, [], set(), 0)
@@ -278,8 +285,9 @@ def count_score_types(hole_scores):
     return birdies, pars, bogeys, double_or_worse
 
 
-def _build_chart_data(chronological_rounds):
+def _build_chart_data(chronological_rounds, entries):
     """Last 20 eighteen-hole rounds with score, differential, and handicap after each."""
+    entry_idx_by_id = {rnd.id: i for i, (rnd, _) in enumerate(entries)}
     eighteen_hole = [
         r
         for r in chronological_rounds
@@ -291,14 +299,12 @@ def _build_chart_data(chronological_rounds):
 
     chart_data = []
     for rnd in last_20:
-        diff = round_to_tenth(
-            round_score_differential(
-                rnd.score, rnd.course_rating, rnd.course_slope
-            )
-        )
-        through = [r for r in chronological_rounds if (r.date, r.id) <= (rnd.date, rnd.id)]
-        entries_through = build_score_differentials(through)
-        hi = _index_from_recent_differentials([d for _, d in entries_through][-20:])
+        idx = entry_idx_by_id.get(rnd.id)
+        if idx is None:
+            continue
+        diff = entries[idx][1]
+        diffs_through = [d for _, d in entries[: idx + 1]][-20:]
+        hi = _index_from_recent_differentials(diffs_through)
         chart_data.append(
             {
                 "date": rnd.date.strftime("%Y-%m-%d"),
@@ -310,14 +316,22 @@ def _build_chart_data(chronological_rounds):
     return chart_data
 
 
-def compute_dashboard_stats(rounds):
+def compute_dashboard_stats(
+    rounds,
+    *,
+    chronological=None,
+    entries=None,
+):
     """Aggregate stats for the dashboard, computed server-side."""
     if not rounds:
         return {}
 
-    chronological = sorted(rounds, key=lambda r: (r.date, r.id))
-    entries = build_score_differentials(chronological)
+    if chronological is None:
+        chronological = sorted(rounds, key=lambda r: (r.date, r.id))
+    if entries is None:
+        entries = build_score_differentials(chronological)
     diff_by_id = {rnd.id: diff for rnd, diff in entries}
+    entry_idx_by_id = {rnd.id: i for i, (rnd, _) in enumerate(entries)}
 
     recent_entries = entries[-20:]
     recent_diffs = [d for _, d in recent_entries]
@@ -343,9 +357,11 @@ def compute_dashboard_stats(rounds):
 
     trend_handicaps = []
     for rnd in last_10_chrono:
-        prior = [r for r in chronological if (r.date, r.id) < (rnd.date, rnd.id)]
-        prior_entries = build_score_differentials(prior)
-        prior_diffs = [d for _, d in prior_entries][-20:]
+        idx = entry_idx_by_id.get(rnd.id)
+        if idx is None:
+            trend_handicaps.append(None)
+            continue
+        prior_diffs = [d for _, d in entries[:idx]][-20:]
         hi = _index_from_recent_differentials(prior_diffs)
         if hi is None and rnd.id in diff_by_id:
             hi = truncate_handicap_index(diff_by_id[rnd.id] * 0.96)
@@ -356,7 +372,7 @@ def compute_dashboard_stats(rounds):
     if len(valid_trend) > 1:
         handicap_trend = round(valid_trend[-1] - valid_trend[0], 2)
 
-    chart_data = _build_chart_data(chronological)
+    chart_data = _build_chart_data(chronological, entries)
 
     last_20_with_scores = [
         r
