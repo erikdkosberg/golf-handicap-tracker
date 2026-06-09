@@ -204,6 +204,8 @@ function SyncGolfshotButton({ token, onSync, disabled, defaultPlayerName }) {
 
 
 // --------- Main Dashboard -----------
+const ROUNDS_PER_PAGE = 40;
+
 export default function Dashboard({ token, onLogout }) {
   const [rounds, setRounds] = useState([]);
   const [handicapData, setHandicapData] = useState(null);
@@ -212,6 +214,7 @@ export default function Dashboard({ token, onLogout }) {
   const [sortField, setSortField] = useState("date");
   const [sortDirection, setSortDirection] = useState("desc");
   const [gmailLinked, setGmailLinked] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const initialHandicapLoad = useRef(true);
 
   const handleAuthError = useCallback(
@@ -281,6 +284,7 @@ export default function Dashboard({ token, onLogout }) {
   }));
   const highlightRoundIds = new Set(handicapData?.highlighted_round_ids ?? []);
   const handleSort = (field) => {
+    setCurrentPage(1);
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -317,6 +321,16 @@ export default function Dashboard({ token, onLogout }) {
     return 0;
   });
 
+  const totalPages = Math.max(1, Math.ceil(sortedRounds.length / ROUNDS_PER_PAGE));
+  const pageStart = (currentPage - 1) * ROUNDS_PER_PAGE;
+  const paginatedRounds = sortedRounds.slice(pageStart, pageStart + ROUNDS_PER_PAGE);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const formatToPar = (roundInfo) => {
     if (!roundInfo) return "N/A";
     const diff = roundInfo.to_par;
@@ -326,15 +340,6 @@ export default function Dashboard({ token, onLogout }) {
 
   return (
     <div className="max-w-6xl mx-auto px-2 sm:px-6 py-4 sm:py-8">
-      <div className="flex gap-4 mb-6">
-        <LinkGmailButton token={token} disabled={gmailLinked} />
-        <SyncGolfshotButton
-          token={token}
-          disabled={!gmailLinked}
-          onSync={fetchData}
-        />
-      </div>
-
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 sm:gap-0">
         <h1 className="text-2xl font-bold text-indigo-900 text-center sm:text-left">
           Hello, {username}!
@@ -500,7 +505,8 @@ export default function Dashboard({ token, onLogout }) {
               </tr>
             </thead>
             <tbody>
-              {sortedRounds.map((r, idx) => {
+              {paginatedRounds.map((r, pageIdx) => {
+                const idx = pageStart + pageIdx;
                 const isTop20 = sortField === "date" && sortDirection === "desc" && idx < 20;
                 const isHighlighted = isTop20 && highlightRoundIds.has(r.id);
                 const isHandicapCutoff =
@@ -541,6 +547,48 @@ export default function Dashboard({ token, onLogout }) {
               })}
             </tbody>
           </table>
+        </div>
+
+        {sortedRounds.length > ROUNDS_PER_PAGE && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
+            <span className="text-sm text-gray-600">
+              Showing {pageStart + 1}–
+              {Math.min(pageStart + ROUNDS_PER_PAGE, sortedRounds.length)} of{" "}
+              {sortedRounds.length} rounds
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPage === 1}
+                className="bg-gray-200 rounded px-4 py-1.5 font-semibold hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-600 min-w-[7rem] text-center">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setCurrentPage((page) => Math.min(totalPages, page + 1))
+                }
+                disabled={currentPage === totalPages}
+                className="bg-gray-200 rounded px-4 py-1.5 font-semibold hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-4 mt-6">
+          <LinkGmailButton token={token} disabled={gmailLinked} />
+          <SyncGolfshotButton
+            token={token}
+            disabled={!gmailLinked}
+            onSync={fetchData}
+          />
         </div>
       </div>
     </div>
