@@ -1,0 +1,98 @@
+.hole-map-root {
+  touch-action: pan-x pan-y;
+}
+
+.hole-map-canvas {
+  transition: filter 0.35s ease;
+}
+
+.pga-mode .hole-map-canvas {
+  filter: saturate(1.28) contrast(1.07) brightness(1.04);
+}
+
+.hole-map-vignette {
+  background: radial-gradient(
+    ellipse 82% 74% at 50% 44%,
+    transparent 38%,
+    rgba(0, 0, 0, 0.2) 72%,
+    rgba(0, 0, 0, 0.38) 100%
+  );
+}
+
+.hole-map-sunlight {
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    transparent 40%,
+    transparent 68%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+}
+
+.hole-slide-enter {
+  animation: holeSlideIn 0.3s ease-out;
+}
+
+@keyframes holeSlideIn {
+  from { opacity: 0.6; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.hole-slide-enter-prev {
+  animation: holeSlideInPrev 0.3s ease-out;
+}
+
+@keyframes holeSlideInPrev {
+  from { opacity: 0.6; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.green-dist-btn {
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.green-dist-btn:active { transform: scale(0.96); }
+
+.green-dist-btn.active {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+}
+
+.hazard-btn {
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.hazard-btn:active { transform: scale(0.97); }
+
+.hazard-btn.active {
+  background: rgba(30, 111, 217, 0.35);
+}
+
+.club-pill {
+  background: linear-gradient(135deg, #1e6fd9 0%, #1557b0 100%);
+  box-shadow: 0 2px 12px rgba(30, 111, 217, 0.45);
+}
+
+.hole-dot {
+  transition: width 0.2s ease, background 0.2s ease;
+}
+
+.hole-dot.active { width: 18px; }
+
+.chrome-hidden .hole-chrome {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.hole-chrome { transition: opacity 0.25s ease; }
+
+.zoom-badge {
+  background: rgba(30, 111, 217, 0.85);
+  animation: pulseZoom 2s ease-in-out infinite;
+}
+
+@keyframes pulseZoom {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}

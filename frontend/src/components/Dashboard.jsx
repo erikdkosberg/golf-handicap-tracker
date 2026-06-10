@@ -6,6 +6,7 @@ import RoundRow from "./RoundRow";
 import AddRoundForm from "./AddRoundForm";
 import HandicapCalculator from "./HandicapCalculator";
 import HandicapBreakdown from "./HandicapBreakdown";
+import CourseViewer from "./CourseViewer";
 import { ScoreHandicapChart } from "./ScoreHandicapChart";
 import { StatCard, TrendCard } from "./StatCards";
 import { formatDate } from "../utilities/utility";
@@ -209,6 +210,7 @@ const ROUNDS_PER_PAGE = 40;
 
 export default function Dashboard({ token, onLogout }) {
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showCourseViewer, setShowCourseViewer] = useState(false);
   const [rounds, setRounds] = useState([]);
   const [handicapData, setHandicapData] = useState(null);
   const [handicapLoading, setHandicapLoading] = useState(true);
@@ -352,18 +354,31 @@ export default function Dashboard({ token, onLogout }) {
     );
   }
 
+  if (showCourseViewer) {
+    return <CourseViewer onBack={() => setShowCourseViewer(false)} />;
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-2 sm:px-6 py-4 sm:py-8">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 sm:gap-0">
         <h1 className="text-2xl font-bold text-indigo-900 text-center sm:text-left">
           Hello, {username}!
         </h1>
-        <button
-          onClick={onLogout}
-          className="bg-gray-200 rounded px-6 py-2 font-semibold hover:bg-gray-300 w-full sm:w-auto"
-        >
-          Log Out
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setShowCourseViewer(true)}
+            className="flex-1 sm:flex-none bg-green-700 text-white rounded px-5 py-2 font-semibold hover:bg-green-800 transition"
+          >
+            Course Viewer
+          </button>
+          <button
+            onClick={onLogout}
+            className="flex-1 sm:flex-none bg-gray-200 rounded px-6 py-2 font-semibold hover:bg-gray-300"
+          >
+            Log Out
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-8 h-auto md:h-[460px] min-h-0">

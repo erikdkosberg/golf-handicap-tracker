@@ -1,0 +1,9 @@
+{
+  "courseId": "pine-meadow",
+  "name": "Pine Meadow Golf Club",
+  "location": "Mundelein, IL",
+  "osmBbox": [-87.995, 42.285, -87.972, 42.298],
+  "osmFile": "frontend/src/courses/pine-meadow/osm.xml",
+  "outputGps": "frontend/src/courses/pine-meadow/gps.json",
+  "yardageMarkerInterval": 50
+}

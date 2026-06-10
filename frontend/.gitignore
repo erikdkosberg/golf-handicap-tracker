@@ -22,3 +22,7 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Raw OSM download (regenerate via scripts/process_pine_meadow_osm.py)
+src/data/pine_meadow_osm_map.osm
+src/data/pine_meadow_osm_raw.json

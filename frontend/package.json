@@ -9,6 +9,7 @@
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.10.0",
     "lucide-react": "^0.525.0",
+    "maplibre-gl": "^4.7.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-scripts": "5.0.1",
@@ -19,7 +20,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "course:gps": "python3 ../scripts/courses/process_course.py ../scripts/courses/configs/pine-meadow.json"
   },
   "eslintConfig": {
     "extends": [
